@@ -1,0 +1,79 @@
+body {
+  height: 100vh;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+*::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+*::-webkit-scrollbar-track{
+    background: gray;
+}
+*::-webkit-scrollbar-thumb{
+  background-color: back;
+    border-radius: 20px;
+    border: 3px solid gray;
+}
+
+#root {
+  height: 100vh;
+}
+
+#titlebar {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+#content {
+  height: calc(100vh - 56px - 37px);
+  border-bottom: 1px solid gray;
+}
+#settings {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  align-content: center;
+  justify-content: center;
+}
+#downloads {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+}
+#mods, #modpacks {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+}
+
+.profile-version-color{
+  color: #388e3c;
+}
+.profile-loader {
+  color: #29b6f6;
+}
+.profile-modpack{
+  color: #f44336;
+}
+.profile-uuid{
+  color: #ffb74d;
+}
+
+#app-loader {
+  height: calc(100vh - 37px);
+  background-color: rgb(8, 8, 8);
+  background-image: linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08));
+}

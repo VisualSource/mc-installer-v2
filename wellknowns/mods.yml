@@ -1,0 +1,24 @@
+mods:
+ - 
+  uuid: string
+  name: string
+  img: string
+  desc_short: string
+  desc_long: string
+  supported_versions: 
+    - 
+      version: "1.17.1"
+      download: ""
+  supported_loaders: 
+    - uuid
+    - uuid
+  inconpadable: 
+    - uuid 
+  requires: 
+    - 
+     uuid: string
+     name: string
+  links:
+    -
+     name: string
+     url: string

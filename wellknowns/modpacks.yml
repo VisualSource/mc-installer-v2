@@ -1,0 +1,12 @@
+modpacks: 
+  - 
+    name: string
+    uuid: string
+    img: string
+    mc_version: "1.18.1"
+    mods: [
+     uuid, uuid
+    ]
+    desc_short: string
+    desc_long: string
+    loader: uuid
