@@ -1,4 +1,4 @@
-import { useDebugValue, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import AppHeader from './AppHeader';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { Routes, Route, useNavigate } from "react-router-dom";
@@ -12,18 +12,13 @@ import Mod from '../pages/Mod';
 import Modpack from '../pages/Modpack';
 import Profiles from '../pages/Profiles';
 import AppStartup from '../pages/loading/AppStartup';
-import YAML from 'yaml';
-
-import ProfileManager from '../core/ProfileManager';
-import DownloadManager from '../core/DownloadManager';
-import Database from '../core/Database';
+import AppInit from '../core/AppInit';
 
 const theme = createTheme({
   palette: {
     mode: 'dark',
   },
 });
-
 
 function AppLoading(props: { loading: boolean }){
   if(props.loading){
@@ -54,15 +49,9 @@ function App() {
 
   useEffect(()=>{
     const init = async () => {
-
-      window.YAML = YAML;
-      window._db = new Database();
-      window._profiles = new ProfileManager();
-      window._downloads = new DownloadManager();
-
+      await AppInit();
       naviagte("/");
       setLoading(false);
-      
     }
     init();
   },[]);

@@ -1,7 +1,7 @@
 loaders:
   -
     name: "iris"
-    uuid: ""
+    uuid: lYTnBYfk6v3vikGDnfdz8
     install_cmd: "client -dir {DOT_MINECRAFT} -mcversion {MCV}"
     headless_runner: null
     versions: 
@@ -10,10 +10,10 @@ loaders:
         download: ""
   - 
     name: "optifine"
-    uuid: ""
+    uuid: b1GPSUmh2sj8v5Qr2iDpN
     install_cmd: ""
     headless_runner: 
-      uuid: ""
+      uuid: FsMzTOLMULx98iOwF4rDc
       download: ""
       version: ""
     versions: 
@@ -31,7 +31,7 @@ loaders:
         download: ""
   - 
     name: "fabric"
-    uuid: ""
+    uuid: BLggP_oelt6xtrtoKAvDO
     headless_runner: null
     install_cmd: "client -dir {DOT_MINECRAFT} -mcversion {MCV}"
     versions: 
@@ -43,9 +43,9 @@ loaders:
         download: ""    
   -
     name: "forge"
-    uuid: ""
+    uuid: qtx4MCnskkEsFrKjHnpDj
     headless_runner:
-      uuid: "" 
+      uuid: ZUQYW_NU6z2crkhtno4l2 
       download: ""
       version: ""
     install_cmd: "{APP_JAR} me.xfl03.HeadlessInstaller -installClient {DOT_MINECRAFT}"
