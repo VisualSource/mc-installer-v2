@@ -57,7 +57,7 @@ export interface Loader {
 }
 
 export default class Database {
-    private db = new Db("mod-content",1, { mods: ["_uuid"], modpacks: ["_uuid"], loaders: ["_uuid"], profiles: ["uuid"] });
+    private db = new Db("mod-content",1, { mods: ["_uuid"], modpacks: ["_uuid"], loaders: ["uuid"], profiles: ["uuid"] });
     private async addDoc(collection: "mods" | "modpacks" | "loaders" | "profiles", content: any){
         try {
             const doc = this.db.collection(collection);

@@ -1,24 +1,21 @@
 mods:
  - 
-  uuid: string
-  name: string
-  img: string
-  desc_short: string
-  desc_long: string
+  _uuid: 21TdQ5Mt1hFJ7nXlzbvk9
+  name: Better Third Person
+  img: https://i.imgur.com/ian8HrF.png
+  desc_short: Improves third-person camera view. 
+  desc_long: Mod adds independent rotation of the camera from a third person view. Completely client-side! Uses only legal actions to control player rotations.
   supported_versions: 
     - 
-      version: "1.17.1"
-      download: ""
+      loader: forge
+      version: "1.18.0"
+      download: https://media.forgecdn.net/files/3555/106/BetterThirdPerson-Forge-1.18-1.5.4.jar
   supported_loaders: 
-    - uuid
-    - uuid
-  inconpadable: 
-    - uuid 
-  requires: 
-    - 
-     uuid: string
-     name: string
+    - fabric
+    - forge
+  inconpadable: null 
+  requires: null
   links:
     -
-     name: string
-     url: string
+     name: CurseForge
+     url: https://www.curseforge.com/minecraft/mc-mods/better-third-person

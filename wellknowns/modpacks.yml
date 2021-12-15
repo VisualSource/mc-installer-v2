@@ -1,7 +1,7 @@
 modpacks: 
   - 
     name: string
-    uuid: string
+    _uuid: string
     img: string
     mc_version: "1.18.1"
     mods: [
