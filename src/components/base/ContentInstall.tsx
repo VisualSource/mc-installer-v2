@@ -1,6 +1,12 @@
 import { Accordion, AccordionSummary, AccordionDetails, Typography, Paper, Button, Container, Chip, List, ListItemText, ListItemAvatar, Avatar , ListItem, Card, CardContent, ListItemButton } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { useRecoilState, useRecoilValue } from 'recoil';
+import { startup_modal, game_running } from "../state/stateKeys";
 import {LinkedButton} from '../LinkedButton';
+import { useLocation, useParams } from "react-router-dom";
+import { useState } from "react";
+import { useEffect } from "react";
+import DB, { Loader, Mod } from "../../core/db";
 export function ProfileInfo(props: { mc_version: string, loader: string, links: { name: string, path: string }[] }){
     return (
         <>
@@ -26,7 +32,29 @@ export function ProfileInfo(props: { mc_version: string, loader: string, links: 
     );
 }
 
-export function ModAndPackInfo(props: { incp_mods: any[], req_mods: any[], links: { name: string, link: string }[],  supported_mc: string[], supported_loader: string[]  }){
+const to_array = (data: Map<Loader,Mod[]>) => {
+    const items = [];
+    for(const [loader,mods] of data.entries()){
+        items.push(
+            <ListItem>
+                <ListItemText>LOADER: {loader.toUpperCase()}</ListItemText>
+            </ListItem>
+        );
+        for(const mod of mods){
+            items.push(
+                <ListItemButton key={mod.uuid} component={LinkedButton} to={`/cdn/mod/${mod.uuid}`}>
+                    <ListItemAvatar sx={{ minWidth: "30px" }}>
+                        <Avatar sx={{ borderRadius: 0, width: 24, height: 24 }} src={mod.media.icon ?? undefined}/>
+                    </ListItemAvatar>
+                    <ListItemText>{mod.name}</ListItemText>
+                </ListItemButton>
+            )
+        }
+    }
+    return items;
+}
+
+export function ModAndPackInfo(props: { incp_mods: Map<Loader,Mod[]>, req_mods: Map<Loader,Mod[]>, links: { name: string, path: string }[],  supported_mc: string[], supported_loader: string[]  }){
     return (
         <>
             <Typography>SUPPORTED MC VERSIONS</Typography>
@@ -47,22 +75,13 @@ export function ModAndPackInfo(props: { incp_mods: any[], req_mods: any[], links
             </div>
             <Typography>REQUIRED MODS</Typography>
             <List dense sx={{ padding: 0 }}>
-                {props.req_mods.map((mod,i)=>{
-                    return (
-                        <ListItemButton key={i} component={LinkedButton} to={"/mods/"}>
-                            <ListItemAvatar sx={{ minWidth: "30px" }}>
-                                <Avatar sx={{ borderRadius: 0, width: 24, height: 24 }}/>
-                            </ListItemAvatar>
-                            <ListItemText>{mod.name}</ListItemText>
-                        </ListItemButton>
-                    );
-                })}
+                {to_array(props.req_mods)}
             </List>
             <Typography>LINKS</Typography>
             <List dense sx={{ padding: 0 }}>
                 {props.links.map((link,i)=>{
                     return (
-                        <ListItemButton key={i} component="a" href={link.link}>
+                        <ListItemButton key={i} component="a" href={link.path}>
                             <Typography color="lightblue">{link.name}</Typography>
                         </ListItemButton>
                     );
@@ -70,22 +89,13 @@ export function ModAndPackInfo(props: { incp_mods: any[], req_mods: any[], links
             </List>
             <Typography>INCONPADIABLE WITH</Typography>
             <List dense sx={{ padding: 0 }}>
-                {props.incp_mods.map((mod,i)=>{
-                    return (
-                        <ListItemButton key={i} component={LinkedButton} to={"/mods/"}>
-                            <ListItemAvatar sx={{ minWidth: "30px" }}>
-                                <Avatar sx={{ borderRadius: 0, width: 24, height: 24 }}/>
-                            </ListItemAvatar>
-                            <ListItemText>{mod.name}</ListItemText>
-                        </ListItemButton>
-                    );
-                })}
+                {to_array(props.incp_mods)}
             </List>
         </>
     );
 }
 
-export function ProfileModContent(props: { mods: any[] }){
+export function ProfileModContent(props: { mods: Mod[] }){
     return (
         <Accordion>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -95,9 +105,9 @@ export function ProfileModContent(props: { mods: any[] }){
                 <List dense sx={{ padding: 0 }}>
                     { props.mods.map((mod,i)=>{
                         return (
-                            <ListItemButton key={i} component={LinkedButton} to="/mods/">
+                            <ListItemButton key={i} component={LinkedButton} to={`/cdn/mod/${mod.uuid}`}>
                                 <ListItemAvatar sx={{ minWidth: "30px" }}>
-                                    <Avatar sx={{ borderRadius: 0, width: 24, height: 24 }}/>
+                                    <Avatar sx={{ borderRadius: 0, width: 24, height: 24 }} src={mod.media.icon ?? undefined}/>
                                 </ListItemAvatar>
                                 <ListItemText>{mod.name}</ListItemText>
                             </ListItemButton>
@@ -109,20 +119,67 @@ export function ProfileModContent(props: { mods: any[] }){
     );
 }
 
+const defaultContent = {
+    name: "UNKNOWN CONTENT",
+    links: [],
+    description: "Lorem, ipsum dolor sit amet consectetur adipisicing elit. Nihil, perspiciatis, itaque enim perferendis porro similique repellat sed officia quae, placeat ipsa animi est nesciunt tempora architecto dolorum omnis quasi nobis.",
+    media: {
+        background: "https://images.unsplash.com/photo-1641600484661-d55dcebba4d6?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1630&q=80"
+    },
+    mods: [],
+    mc: "0.0.0",
+    loader: "Vinilla",
+    loaders: ["Vinilla"],
+    required: new Map(),
+    inconpat: new Map(),
+    last_played: "Have not played"
+}
+
 export default function ContentInstall(props: { isProfile: boolean }){
+    const {uuid} = useParams();
+    const location = useLocation();
+    const [_show, setShow] = useRecoilState(startup_modal);
+    const gameRunning = useRecoilValue(game_running);
+    const [content,setContent] = useState<any>(defaultContent);
+    const [modList,setModList] = useState(false);
+    useEffect(()=>{
+        const load = async() => {
+            try {
+                if(!uuid) return;
+                const db = new DB();
+                if(location.pathname.includes("modpack")) {
+                    const mod = await db.getModPack(uuid);
+                    if(mod) setContent(mod); else setContent(defaultContent);
+                    setModList(true);
+                } else if(location.pathname.includes("mod")){
+                    const mod = await db.getMod(uuid);
+                    if(mod) setContent(mod); else setContent(defaultContent);
+                    setModList(false);
+                } else if(location.pathname.includes("profile")) {
+                    const mod = await db.getProfile(uuid);
+                    if(mod) setContent(mod); else setContent(defaultContent);
+                    setModList(true);
+                }
+            } catch (error: any) {
+                console.error("Failed to load content for install");
+            }
+        }
+        load();
+    },[uuid,location]);
+
     return (
         <div id="content-install">
-            <div id="content-install-img" style={{ backgroundImage: 'url("https://images.unsplash.com/photo-1641600484661-d55dcebba4d6?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1630&q=80")' }}>
-                <Typography variant="h6">CONTENT NAME</Typography>
+            <div id="content-install-img" style={{ backgroundImage: `url("${content.media.background ?? defaultContent.media.background}")` }}>
+                <Typography variant="h6">{content.name}</Typography>
             </div>
             <Paper square elevation={1} id="content-install-actions">
                 {
                 props.isProfile ? (<>
-                    <Button size="small" variant="contained">PLAY</Button>
+                    <Button size="small" color={gameRunning ? "warning" : "primary"} variant="contained" onClick={()=>setShow(true)} disabled={gameRunning}>{ gameRunning ? "PLAYING" : "PLAY" }</Button>
                     <Button size="small" variant="contained">EDIT</Button>
                     <div id="profile-played">
                         <Typography sx={{ fontSize: 15 }} variant="subtitle1">LAST PLAYED</Typography>
-                        <Typography sx={{ fontSize: 12 }} variant="body2" color="gray">{new Date().toDateString()}</Typography>
+                        <Typography sx={{ fontSize: 12 }} variant="body2" color="gray">{content?.last_played ?? "Have not played"}</Typography>
                     </div>
                 </> ): <Button size="small" variant="contained">INSTALL</Button>}
             </Paper>
@@ -131,14 +188,14 @@ export default function ContentInstall(props: { isProfile: boolean }){
                     <Card>
                         <CardContent>
                             <Typography>
-                                Lorem, ipsum dolor sit amet consectetur adipisicing elit. Nihil, perspiciatis, itaque enim perferendis porro similique repellat sed officia quae, placeat ipsa animi est nesciunt tempora architecto dolorum omnis quasi nobis.
+                               {content.description}
                             </Typography>
                         </CardContent>
                     </Card>
-                    { props.isProfile ? <ProfileModContent mods={[{name: "MOD NAME"},{name: "MOD NAME 2"}]}/> : null }
+                    { modList ? <ProfileModContent mods={content.mods}/> : null }
                 </Container>
                 <Paper square elevation={5} id="install-info">
-                    { props.isProfile ? <ProfileInfo mc_version="1.18.1" loader="fabric" links={[{name: "GITHUB", path: "https://github.com"}]} /> : <ModAndPackInfo supported_loader={["FABRIC","FORGE"]} supported_mc={["1.18.1","1.17.1"]} links={[{name: "GITHUB", link: "http://github.com"}]} incp_mods={[{name: "OPTIFINE"}]} req_mods={[]}   /> }
+                    { props.isProfile ? <ProfileInfo mc_version={content.mc} loader={content.loader} links={content.links} /> : <ModAndPackInfo supported_loader={content.loaders ? content.loaders : [content.loader] } supported_mc={Array.isArray(content.mc) ? content.mc : [content.mc]} links={content.links} incp_mods={content.inconpat ?? defaultContent.inconpat} req_mods={content.required ?? defaultContent.required}   /> }
                 </Paper>
             </div>
         </div>

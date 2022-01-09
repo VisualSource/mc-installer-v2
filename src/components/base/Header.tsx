@@ -4,13 +4,24 @@ import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import DraftsIcon from '@mui/icons-material/Drafts';
 import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import { useNavigate } from 'react-router-dom';
 import{ LinkedButton } from '../LinkedButton';
 import ListButton from '../ListButton';
 import { appWindow } from '@tauri-apps/api/window';
+import { useEffect, useState } from 'react';
 
 export default function Header(){
     const naviagate = useNavigate();
+    const [isMaximized,setIsMaximized] = useState<boolean>(false);
+    useEffect(()=>{
+        const init = async () => {
+            const maximized = await appWindow.isMaximized();
+            setIsMaximized(maximized);
+        }
+        init();
+        appWindow.listen("tauri://resize",()=>init());
+    },[]);
 
     return (
         <Paper elevation={2} component="header" square data-tauri-drag-region> 
@@ -45,14 +56,14 @@ export default function Header(){
                         </ListButton>
                     </div>
                     <Button size="small" onClick={()=>appWindow.minimize()} ><MinimizeIcon/></Button>
-                    <Button size="small" onClick={()=>appWindow.toggleMaximize()}><FullscreenExitIcon/></Button>
+                    <Button size="small" onClick={()=>appWindow.toggleMaximize()}>{isMaximized ? <FullscreenExitIcon/> : <FullscreenIcon/>}</Button>
                     <Button size="small" color="error" onClick={()=>appWindow.close()}><CloseIcon/></Button>
                 </div>
             </div>
             <div data-tauri-drag-region>
-                <Button size="large" component={LinkedButton} to="/mods">MODS</Button>
-                <Button size="large" component={LinkedButton} to="/modpacks">MOD PACKS</Button>
-                <Button size="large" component={LinkedButton} to="/profiles">PROFILES</Button>
+                <Button size="large" component={LinkedButton} to="/cdn/mods">MODS</Button>
+                <Button size="large" component={LinkedButton} to="/cdn/modpacks">MOD PACKS</Button>
+                <Button size="large" component={LinkedButton} to="/cdn/profiles">PROFILES</Button>
             </div>
         </Paper>
     );
