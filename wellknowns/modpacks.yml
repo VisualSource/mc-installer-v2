@@ -1,12 +1,12 @@
 modpacks: 
   - 
-    name: string
-    _uuid: string
-    img: string
+    name: Fabric Basic
+    _uuid: cQjikdvQjQowUX0_mHOVR
+    img: https://placeholder.com/1920x1080
     mc_version: "1.18.1"
     mods: [
-     uuid, uuid
+      21TdQ5Mt1hFJ7nXlzbvk9
     ]
-    desc_short: string
-    desc_long: string
-    loader: uuid
+    desc_short: fabric mods pack
+    desc_long: this is a test fabric mod pack
+    loader: fabric

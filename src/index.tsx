@@ -1,26 +1,24 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import {createTheme, ThemeProvider} from '@mui/material/styles';
 import { BrowserRouter } from "react-router-dom";
-import YAML from 'yaml';
-
 import reportWebVitals from './reportWebVitals';
 
-import App from './components/App';
-import ProfileManager from './core/ProfileManager';
-import DownloadManager from './core/DownloadManager';
-import Database from './core/Database';
-
+import App from './components/base/App';
 import './index.css';
 
-window.YAML = YAML;
-window._db = new Database();
-window._profiles = new ProfileManager();
-window._downloads = new DownloadManager();
+const theme = createTheme({
+  palette: {
+    mode: "dark"
+  }
+});
 
 ReactDOM.render(
   <React.StrictMode>
     <BrowserRouter>
-      <App />
+      <ThemeProvider theme={theme}>
+        <App/>
+      </ThemeProvider>
     </BrowserRouter>
   </React.StrictMode>,
   document.getElementById('root')

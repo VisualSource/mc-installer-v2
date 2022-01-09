@@ -9,8 +9,7 @@ body {
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
 *::-webkit-scrollbar {
@@ -28,52 +27,185 @@ code {
 
 #root {
   height: 100vh;
+  display: flex;
+}
+#App {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
-#titlebar {
+#header-appbar {
+  margin-top: 5px;
   display: flex;
-  flex-direction: row;
   justify-content: space-between;
 }
-#content {
-  height: calc(100vh - 56px - 37px);
-  border-bottom: 1px solid gray;
-}
-#settings {
+#header-btns-right {
   display: flex;
-  height: 100%;
-  flex-direction: column;
+}
+#header-user {
+  display: flex;
+  justify-content: center;
   align-items: center;
   align-content: center;
+}
+
+#app-content {
+  display: flex;
+  width: 100%;
+  height: calc(100% - 79px - 68px);
+}
+#app-footer {
+  display: flex;
   justify-content: center;
+  align-content: center;
+  align-items: center;
 }
-#downloads {
-  display: flex;
-  height: 100%;
-  flex-direction: column;
-}
-#mods, #modpacks {
-  height: 100%;
+#app-footer-link {
+  padding: 10px 0 10px 0;
+  cursor: pointer;
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  align-content: center;
+}
+
+#content-sort {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
   max-height: 100%;
 }
-
-.profile-version-color{
-  color: #388e3c;
+#content-sort-list {
+  height: 100%;
+  overflow-y: scroll;
 }
-.profile-loader {
-  color: #29b6f6;
-}
-.profile-modpack{
-  color: #f44336;
-}
-.profile-uuid{
-  color: #ffb74d;
+#content-list {
+  overflow-y: scroll;
+  height: 100%;
+  margin: 10px 0 10px 0;
 }
 
-#app-loader {
-  height: calc(100vh - 37px);
-  background-color: rgb(8, 8, 8);
-  background-image: linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08));
+#content-install-img {
+  height: 228px;
+  width: 100%;
+  background: no-repeat;
+  background-size: cover;
+  background-position: top;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+#content-install-img > h6 {
+  margin: 0 15px 0 10px;
+}
+#content-install {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+#content-install-actions {
+  height: 65px;
+  display: flex;
+  justify-content: flex-start;
+  align-content: center;
+  align-items: center;
+  padding-left: 10px;
+  gap: 15px;
+}
+#content-install-info {
+  display: flex;
+  height: 100%;
+}
+#install-desc {
+  height: 100%;
+  width: 100%;
+  margin-top: 25px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+#profile-played {
+  display: flex;
+  flex-direction: column;
+}
+#install-info {
+  overflow-y: scroll;
+  height: 100%;
+  width: 340px;
+  padding-left: 10px;
+  padding-top: 10px;
+}
+#supported-mc-verions, #supported-loaders {
+  display: flex;
+  padding: 5px 25px 5px 5px;
+  gap: 5px;
+}
+.css-o4b71y-MuiAccordionSummary-content.Mui-expanded{
+  margin: 0 !important;
+}
+.css-1tmu6hb-MuiButtonBase-root-MuiAccordionSummary-root.Mui-expanded {
+  min-height: 40px !important;
+}
+
+#downloads {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+#current-download {
+  height: 82px;
+  display: flex;
+  justify-content: space-between;
+}
+#current-download-name {
+  margin-left: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  align-content: center;
+  gap: 15px;
+}
+#download-progress {
+  margin-right: 20px;
+  display: flex;
+  justify-content: center;
+  align-content: center;
+  align-items: center;
+}
+#download-est {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  margin-right: 10px;
+}
+#download-est-mb {
+  display: flex;
+  justify-content: space-between;
+  width: 400px;
+}
+#download-amount {
+  display: flex;
+  justify-content: flex-end;
+}
+.download-divider {
+  display: flex;
+}
+.download-divider > hr {
+  width: 100%;
+}
+
+#settings {
+  height: 100%;
+  width: 100%;
+  display: flex;
+}
+.add-options {
+  height: 100%;
+  width: 100%;
+  margin-top: 10px;
 }
