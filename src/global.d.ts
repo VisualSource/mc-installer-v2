@@ -2,8 +2,7 @@
 
 
 interface Window {
-    _profiles: import("./core/ProfileManager").default;
-    _downloads: import("./core/DownloadManager").default;
+    _downloads: import("./core/downloads").default;
     _db: import("./core/db").default;
     YAML: {
         parse: (str: string, options?: import("yaml").Options | undefined) => any;

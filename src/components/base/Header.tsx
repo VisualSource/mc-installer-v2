@@ -1,4 +1,4 @@
-import {Paper, MenuItem, Avatar, Button} from '@mui/material';
+import {Paper, MenuItem, Avatar, Button, IconButton, Divider } from '@mui/material';
 import MinimizeIcon from '@mui/icons-material/Minimize';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import DraftsIcon from '@mui/icons-material/Drafts';
@@ -26,44 +26,49 @@ export default function Header(){
     return (
         <Paper elevation={2} component="header" square data-tauri-drag-region> 
             <div id="header-appbar" data-tauri-drag-region>
-                <ListButton name="File" btnProps={{ size: "small" }}>
-                    {({handleClose}: any)=>{
-                        return [
-                                <MenuItem key={0} onClick={()=>{ handleClose(); naviagate("/"); }}>Home</MenuItem>,
-                                <MenuItem key={1} onClick={()=>{ handleClose(); naviagate("/settings"); }}>Settings</MenuItem>,
-                                <MenuItem key={2} onClick={()=>{ handleClose(); appWindow.close(); }}>Exit</MenuItem>
-                        ];
-                    }}
+                <ListButton name="File" btnProps={{ size: "small", sx: {borderRadius: 0} }}>
+                    {({handleClose}: any)=>[
+                            <MenuItem key={0} onClick={()=>{ handleClose(); naviagate("/"); }}>Home</MenuItem>,
+                            <Divider key={1}/>,
+                            <MenuItem key={2} onClick={()=>{ handleClose(); naviagate("/settings"); }}>Settings</MenuItem>,
+                            <Divider key={3}/>,
+                            <MenuItem key={4} onClick={()=>{ handleClose(); appWindow.close(); }}>Exit</MenuItem>
+                        ]
+                    }
                 </ListButton>
                 <div id="header-btns-right" data-tauri-drag-region>
-                    <ListButton btnProps={{ children: [<DraftsIcon/>], size: "small" }}>
-                        {({handleClose}: any)=>{
-                            return [
+                    <ListButton btnProps={{ sx: { borderRadius: 0, marginRight: "20px" }, children: [<DraftsIcon key={0}/>], size: "small" }}>
+                        {({handleClose}: any)=> [
                                 <MenuItem key={1} onClick={()=>{ handleClose(); naviagate("/downloads"); }}>Updates</MenuItem>
-                            ];
-                        }}
+                            ]
+                        }
                     </ListButton>
                     <div id="header-user">
-                        <Avatar variant="square" sx={{ fontSize: 15, bgcolor: "green", width: 31, height: 31 }} children="VS"/>
-                        <ListButton name="USERNAME" btnProps={{ sx: { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }, variant:"outlined", color: "primary", size: "small", endIcon: <KeyboardArrowDownIcon/> }}>
-                            {({handleClose}: any)=>{
-                                return [
-                                    <MenuItem key={1} onClick={()=>{ handleClose(); naviagate("/settings"); }}>Account</MenuItem>,
-                                    <MenuItem key={2} onClick={handleClose}>Logout: USERNAME</MenuItem>
+                        <Avatar variant="square" sx={{ color: "white", width: 31, height: 31 }}/>
+                        <ListButton name="USERNAME" btnProps={{ sx: { borderRadius: 0  }, variant:"outlined", color: "primary", size: "small", endIcon: <KeyboardArrowDownIcon/> }}>
+                            {({handleClose}: any)=> [
+                                <MenuItem key={1} onClick={()=>{ handleClose(); naviagate("/settings"); }}>Account</MenuItem>,
+                                <Divider key={3}/>,
+                                <MenuItem key={2} onClick={handleClose}>Logout: USERNAME</MenuItem>
                                    
-                                ];
-                            }}
+                            ]}
                         </ListButton>
                     </div>
-                    <Button size="small" onClick={()=>appWindow.minimize()} ><MinimizeIcon/></Button>
-                    <Button size="small" onClick={()=>appWindow.toggleMaximize()}>{isMaximized ? <FullscreenExitIcon/> : <FullscreenIcon/>}</Button>
-                    <Button size="small" color="error" onClick={()=>appWindow.close()}><CloseIcon/></Button>
+                    <IconButton color="primary" sx={{ borderRadius: 0, marginLeft: "25px" }} onClick={()=>appWindow.minimize()} size="small">
+                        <MinimizeIcon/>
+                    </IconButton>
+                    <IconButton color="primary" sx={{ borderRadius: 0 }} onClick={()=>appWindow.toggleMaximize()} size="small">
+                        {isMaximized ? <FullscreenExitIcon/> : <FullscreenIcon/>}
+                    </IconButton>
+                    <IconButton color="error" sx={{ borderRadius: 0 }} onClick={()=>appWindow.close()} size="small">
+                        <CloseIcon/>
+                    </IconButton>
                 </div>
             </div>
             <div data-tauri-drag-region>
-                <Button size="large" component={LinkedButton} to="/cdn/mods">MODS</Button>
-                <Button size="large" component={LinkedButton} to="/cdn/modpacks">MOD PACKS</Button>
-                <Button size="large" component={LinkedButton} to="/cdn/profiles">PROFILES</Button>
+                <Button size="large" isActiveLink component={LinkedButton} to="/cdn/mods">MODS</Button>
+                <Button size="large" isActiveLink component={LinkedButton} to="/cdn/modpacks">MOD PACKS</Button>
+                <Button size="large" isActiveLink component={LinkedButton} to="/cdn/profiles">PROFILES</Button>
             </div>
         </Paper>
     );

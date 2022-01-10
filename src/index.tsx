@@ -5,13 +5,13 @@ import { BrowserRouter } from "react-router-dom";
 import {RecoilRoot} from 'recoil';
 import reportWebVitals from './reportWebVitals';
 import DB from './core/db';
+import Download from './core/downloads';
 import App from './components/base/App';
 import './index.css';
 
-import {run} from './components/state/fakedata';
-//run();
-
 window._db = new DB();
+window._downloads = new Download();
+
 
 const theme = createTheme({
   palette: {

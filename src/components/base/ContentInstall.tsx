@@ -1,12 +1,16 @@
 import { Accordion, AccordionSummary, AccordionDetails, Typography, Paper, Button, Container, Chip, List, ListItemText, ListItemAvatar, Avatar , ListItem, Card, CardContent, ListItemButton } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { useRecoilState, useRecoilValue } from 'recoil';
-import { startup_modal, game_running } from "../state/stateKeys";
+import { useRecoilValue, useSetRecoilState } from 'recoil';
+import { startup_modal, game_running, profile_modal, edit_profile_dialog, modpack_install_dialog } from "../state/stateKeys";
 import {LinkedButton} from '../LinkedButton';
 import { useLocation, useParams } from "react-router-dom";
 import { useState } from "react";
 import { useEffect } from "react";
 import DB, { Loader, Mod } from "../../core/db";
+import GetAppIcon from '@mui/icons-material/GetApp';
+import EditIcon from '@mui/icons-material/Edit';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import BackgroundImage from '../../images/background.jpg';
 export function ProfileInfo(props: { mc_version: string, loader: string, links: { name: string, path: string }[] }){
     return (
         <>
@@ -22,7 +26,7 @@ export function ProfileInfo(props: { mc_version: string, loader: string, links: 
             <List dense sx={{ padding: 0 }}>
                 {props.links.map((link,i)=>{
                     return (
-                        <ListItemButton key={i} component="a" href={link.path} >
+                        <ListItemButton key={i} component="a" target="_blank" href={link.path} >
                             <Typography color="lightblue">{link.name}</Typography>
                         </ListItemButton>
                     );
@@ -81,7 +85,7 @@ export function ModAndPackInfo(props: { incp_mods: Map<Loader,Mod[]>, req_mods: 
             <List dense sx={{ padding: 0 }}>
                 {props.links.map((link,i)=>{
                     return (
-                        <ListItemButton key={i} component="a" href={link.path}>
+                        <ListItemButton key={i} component="a" target="_blank" href={link.path}>
                             <Typography color="lightblue">{link.name}</Typography>
                         </ListItemButton>
                     );
@@ -103,16 +107,15 @@ export function ProfileModContent(props: { mods: Mod[] }){
             </AccordionSummary>
             <AccordionDetails>
                 <List dense sx={{ padding: 0 }}>
-                    { props.mods.map((mod,i)=>{
-                        return (
+                    { props.mods.map((mod,i)=> (
                             <ListItemButton key={i} component={LinkedButton} to={`/cdn/mod/${mod.uuid}`}>
                                 <ListItemAvatar sx={{ minWidth: "30px" }}>
                                     <Avatar sx={{ borderRadius: 0, width: 24, height: 24 }} src={mod.media.icon ?? undefined}/>
                                 </ListItemAvatar>
                                 <ListItemText>{mod.name}</ListItemText>
                             </ListItemButton>
-                        );
-                    })}
+                        )
+                    )}
                 </List>
             </AccordionDetails>
         </Accordion>
@@ -124,7 +127,7 @@ const defaultContent = {
     links: [],
     description: "Lorem, ipsum dolor sit amet consectetur adipisicing elit. Nihil, perspiciatis, itaque enim perferendis porro similique repellat sed officia quae, placeat ipsa animi est nesciunt tempora architecto dolorum omnis quasi nobis.",
     media: {
-        background: "https://images.unsplash.com/photo-1641600484661-d55dcebba4d6?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1630&q=80"
+        background: BackgroundImage
     },
     mods: [],
     mc: "0.0.0",
@@ -134,34 +137,86 @@ const defaultContent = {
     inconpat: new Map(),
     last_played: "Have not played"
 }
+const get_type = (path: string): string => {
+    if(path.includes("modpack")) return "modpack";
+    if(path.includes("mod")) return "mod";
+    if(path.includes("profile")) return "profile";
+    return "unset";
+}
+
+const hasModList = (type: string): boolean => {
+    return ["modpack","profile"].includes(type);
+}
+
+function Actions({type, content}: { content: any, type: "mod" | "modpack" | "profile" | "unset"}){
+    const setStartupDialog = useSetRecoilState(startup_modal);
+    const setProfileDialog = useSetRecoilState(profile_modal);
+    const setEditProfile = useSetRecoilState(edit_profile_dialog);
+    const setModpack = useSetRecoilState(modpack_install_dialog);
+    const gameRunning = useRecoilValue(game_running);
+    switch (type) {
+        case "mod":
+            return <Button size="small" startIcon={<GetAppIcon/>} variant="contained" onClick={()=>setProfileDialog({show: true, mod: content.uuid})}>INSTALL</Button>;
+        case "profile":
+            return (
+                <>
+                    <Button size="small" startIcon={<PlayArrowIcon/>} color={gameRunning ? "warning" : "primary"} variant="contained" onClick={()=>setStartupDialog(true)} disabled={gameRunning}>{ gameRunning ? "PLAYING" : "PLAY" }</Button>
+                    <Button size="small" variant="contained" startIcon={<EditIcon/>} onClick={()=>setEditProfile({show: true, profile: content.uuid})}>EDIT</Button>
+                    <div id="profile-played">
+                        <Typography sx={{ fontSize: 15 }} variant="subtitle1">LAST PLAYED</Typography>
+                        <Typography sx={{ fontSize: 12 }} variant="body2" color="gray">{content?.last_played ?? "Have not played"}</Typography>
+                    </div>
+                </>
+            );
+        case "modpack":
+            return <Button size="small" startIcon={<GetAppIcon/>} variant="contained" onClick={()=>setModpack({show: true, pack: content.uuid})}>INSTALL</Button>;
+        default:
+            return null;
+    }
+}
 
 export default function ContentInstall(props: { isProfile: boolean }){
     const {uuid} = useParams();
     const location = useLocation();
-    const [_show, setShow] = useRecoilState(startup_modal);
-    const gameRunning = useRecoilValue(game_running);
     const [content,setContent] = useState<any>(defaultContent);
-    const [modList,setModList] = useState(false);
+    const [contentType,setContentType] = useState<"mod" | "modpack" | "profile" | "unset">("unset");
     useEffect(()=>{
         const load = async() => {
             try {
-                if(!uuid) return;
+                if(!uuid) throw new Error("Invaild uuid");
                 const db = new DB();
-                if(location.pathname.includes("modpack")) {
-                    const mod = await db.getModPack(uuid);
-                    if(mod) setContent(mod); else setContent(defaultContent);
-                    setModList(true);
-                } else if(location.pathname.includes("mod")){
-                    const mod = await db.getMod(uuid);
-                    if(mod) setContent(mod); else setContent(defaultContent);
-                    setModList(false);
-                } else if(location.pathname.includes("profile")) {
-                    const mod = await db.getProfile(uuid);
-                    if(mod) setContent(mod); else setContent(defaultContent);
-                    setModList(true);
+                const type = get_type(location.pathname);
+                switch(type){
+                    case "mod": {
+                        const mod = await db.getMod(uuid);
+                        if(!mod) throw new Error("Failed to get mod");
+                        setContent(mod);
+                        setContentType(type);
+                        break;
+                    }
+                    case "modpack": {
+                        const modpack = await db.getModPack(uuid);
+                        if(!modpack) throw new Error("Failed to get modpack");
+                        setContent(modpack);
+                        setContentType(type);
+                        break;
+                    }
+                    case "profile": {
+                        const profile = await db.getProfile(uuid);
+                        if(!profile) throw new Error("Failed to get profile");
+                        setContent(profile);
+                        setContentType(type);
+                        break;
+                    }
+                    default: 
+                        setContent(defaultContent);
+                        setContentType("unset");
+                        break;
                 }
             } catch (error: any) {
-                console.error("Failed to load content for install");
+                console.warn("Failed to load content for install or was unset");
+                setContentType("unset");
+                setContent(defaultContent);
             }
         }
         load();
@@ -173,15 +228,7 @@ export default function ContentInstall(props: { isProfile: boolean }){
                 <Typography variant="h6">{content.name}</Typography>
             </div>
             <Paper square elevation={1} id="content-install-actions">
-                {
-                props.isProfile ? (<>
-                    <Button size="small" color={gameRunning ? "warning" : "primary"} variant="contained" onClick={()=>setShow(true)} disabled={gameRunning}>{ gameRunning ? "PLAYING" : "PLAY" }</Button>
-                    <Button size="small" variant="contained">EDIT</Button>
-                    <div id="profile-played">
-                        <Typography sx={{ fontSize: 15 }} variant="subtitle1">LAST PLAYED</Typography>
-                        <Typography sx={{ fontSize: 12 }} variant="body2" color="gray">{content?.last_played ?? "Have not played"}</Typography>
-                    </div>
-                </> ): <Button size="small" variant="contained">INSTALL</Button>}
+                <Actions type={contentType} content={content} />
             </Paper>
             <div id="content-install-info">
                 <Container id="install-desc">
@@ -192,7 +239,7 @@ export default function ContentInstall(props: { isProfile: boolean }){
                             </Typography>
                         </CardContent>
                     </Card>
-                    { modList ? <ProfileModContent mods={content.mods}/> : null }
+                    { hasModList(contentType) ? <ProfileModContent mods={content.mods ?? []}/> : null }
                 </Container>
                 <Paper square elevation={5} id="install-info">
                     { props.isProfile ? <ProfileInfo mc_version={content.mc} loader={content.loader} links={content.links} /> : <ModAndPackInfo supported_loader={content.loaders ? content.loaders : [content.loader] } supported_mc={Array.isArray(content.mc) ? content.mc : [content.mc]} links={content.links} incp_mods={content.inconpat ?? defaultContent.inconpat} req_mods={content.required ?? defaultContent.required}   /> }

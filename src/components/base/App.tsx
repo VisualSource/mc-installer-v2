@@ -11,15 +11,25 @@ import Settings from "../Settings";
 import SettingsAccount from "../settings/SettingsAccount";
 import SettingsDownloads from "../settings/SettingsDownloads";
 import SettingsInstalls from "../settings/SettingsInstalls";
-
+import SettingsMinecraft from "../settings/SettingsMinecraft";
 import Home from "../Home";
 
 import StartUp from "../modals/StartUp";
+import ProfileSelection from "../modals/ProfileSelection";
+import MessageDialog from "../modals/MessageDialog";
+import AddProfileDialog from "../modals/AddProfileDialog";
+import EditProfileDialog from "../modals/EditProfileDialog";
+import InstallModpack from '../modals/InstallModpack';
 
 export default function App(){
     return (
         <div id="App">
             <StartUp/>
+            <ProfileSelection/>
+            <MessageDialog/>
+            <AddProfileDialog/>
+            <EditProfileDialog/>
+            <InstallModpack/>
             <Header/> 
             <Paper square component="main" id="app-content" elevation={0}>
                 <Routes>
@@ -28,6 +38,7 @@ export default function App(){
                         <Route index element={<SettingsAccount/>}/>
                         <Route path="downloads" element={<SettingsDownloads/>}/>
                         <Route path="installs" element={<SettingsInstalls/>}/>
+                        <Route path="minecraft" element={<SettingsMinecraft/>}/>
                    </Route>
                    <Route path="cdn" element={<ContentSort/>}>
                         <Route path="mods" element={<ContentList type="mod"/>}/>
@@ -38,21 +49,9 @@ export default function App(){
                         <Route path="modpack/:uuid" element={<ContentInstall isProfile={false}/>}/>
                    </Route>
                    <Route path="downloads" element={<Downloads/>}/>
-
-                
                 </Routes>
             </Paper>      
             <Footer/>
         </div>
     );
 }
-
-/*
-  <Route path="mods" element={<ContentSort type="mod"><ContentList type="mod"/></ContentSort>} />
-                   <Route path="modpacks" element={<ContentSort type="modpack"><ContentList type="modpack"/></ContentSort>} />
-                   <Route path="profiles" element={<ContentSort type="profile"> <ContentList type="profile"/> </ContentSort>} />
-                   <Route path="mod/:id" element={<ContentSort type="mod"><ContentInstall isProfile={false}/></ContentSort>} />
-                   <Route path="modpack/:id" element={<ContentSort type="modpack"><ContentInstall isProfile={false}/></ContentSort>} />
-                   <Route path="profile/:id" element={<ContentSort type="profile"><ContentInstall isProfile={true}/></ContentSort>} />
-
-*/

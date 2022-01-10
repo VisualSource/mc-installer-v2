@@ -55,6 +55,7 @@ export interface Profile {
     can_edit: boolean;
     can_delete: boolean;
     links: { name: string, path: string }[];
+    modpack_uuid: UUID | null;
     uuid: UUID;
     mods: UUID[];
     media: {
@@ -108,6 +109,7 @@ export interface ProfileExpand {
     can_edit: boolean;
     can_delete: boolean;
     links: { name: string, path: string }[];
+    modpack_uuid: UUID | null;
     uuid: UUID;
     mods: Mod[];
     media: {
@@ -122,19 +124,17 @@ export interface ProfileExpand {
 
 export interface EditableProfileProps {
     description?: string;
-    icon?: string | null;
-    background_img?: string | null;
+    media?: {
+        icon: string | null;
+        list: string | null;
+        background: string | null;
+    }
     mods?: UUID[];
     name?: string;
     mc?: MCVersion;
     loader?: Loader;
     links?: { name: string, path: string }[];
     last_played?: string | null;
-    media?: {
-        icon?: string | null;
-        list?: string | null;
-        background?: string | null;
-    }
 }
 
 export type CategoryList = { 
@@ -149,6 +149,9 @@ export type CategoryList = {
         } 
     }[]
 }[];
+
+export const minecraft_verions: MCVersion[] = ["1.17.0","1.17.1","1.18.1","1.18.0"];
+export const minecraft_loaders: Loader[] = ["fabric","forge","iris","optifine"];
 
 export default class DB {
     static INSTANCE: DB | null = null;
@@ -166,7 +169,12 @@ export default class DB {
         this.profiles = this.db.collection("profiles");
         this.loaders = this.db.collection("loaders");
     }
-
+    public get on(){
+        return this.db.addListener;
+    }
+    public get off(){
+        return this.db.removeListener;
+    }
     public async getModList(): Promise<CategoryList | null> {
         try {
             const mods = await this.mods.find({});
@@ -194,14 +202,14 @@ export default class DB {
             return null;
         }
     }
-    public async getMod(uuid_get: UUID): Promise<ModExpand | null> {
+    public async getMod(uuid_get: UUID, expanded: boolean = true): Promise<ModExpand | null> {
         try {
             const {category, uuid,name,required,inconpat,loaders,mc,version,media,links,description} = await this.mods.findOne({ uuid: uuid_get }) as Mod;
 
             const required_expaned = new Map<Loader,Mod[]>();
             const inconpat_expaned = new Map<Loader,Mod[]>();
 
-            for(const [loader,mods] of required.entries()){
+            if(expanded) for(const [loader,mods] of required.entries()){
                 let mod_list: Mod[] = [];
                 for(const mod_id of mods){
                     const mod = await this.mods.findOne({ uuid: mod_id }) as Mod;
@@ -210,7 +218,7 @@ export default class DB {
                 required_expaned.set(loader,mod_list);
             }
 
-            for(const [loader,mods] of inconpat.entries()){
+            if(expanded) for(const [loader,mods] of inconpat.entries()){
                 let mod_list: Mod[] = [];
                 for(const mod_id of mods){
                     const mod = await this.mods.findOne({ uuid: mod_id }) as Mod;
@@ -228,8 +236,8 @@ export default class DB {
                 media,
                 links,
                 description,
-                required: required_expaned,
-                inconpat: inconpat_expaned,
+                required: expanded ? required_expaned : required,
+                inconpat: expanded ? inconpat_expaned : inconpat,
                 category
             } as ModExpand;
         } catch (error: any) {
@@ -245,12 +253,12 @@ export default class DB {
             return null;
         }
     }
-    public async getModPack(get_uuid: UUID): Promise<ModPackExpand | null> {
+    public async getModPack(get_uuid: UUID, expanded: boolean = true): Promise<ModPackExpand | null> {
         try {
             const {name,category, uuid,version,mods,mc,loader,media,links,description} = await this.modpacks.findOne({ uuid: get_uuid}) as ModPack;
 
             const mods_exp: Mod[] = [];
-            for(const mod of mods){
+            if(expanded)  for(const mod of mods){
                 const mod_data = await this.mods.findOne({ uuid: mod }) as Mod;
                 mods_exp.push(mod_data);
             }
@@ -264,7 +272,7 @@ export default class DB {
                 media,
                 links,
                 description,
-                mods: mods_exp,
+                mods: expanded ? mods_exp : mods,
                 category
             } as ModPackExpand;
             
@@ -273,13 +281,13 @@ export default class DB {
             return null;
         }
     }
-    public async getProfile(id: UUID): Promise<ProfileExpand | null> {
+    public async getProfile(id: UUID, expanded: boolean = true): Promise<ProfileExpand | null> {
         try {
             const {last_played, category, name,mc,loader,can_delete,can_edit,links,uuid,mods,media,description} = await this.profiles.findOne({ uuid: id }) as Profile;
 
             const mods_exp: Mod[] = [];
 
-            for(const mod of mods){
+            if(expanded) for(const mod of mods){
                 const mod_data = await this.mods.findOne({ uuid: mod }) as Mod;
                 mods_exp.push(mod_data);
             }
@@ -294,7 +302,7 @@ export default class DB {
                 description,
                 can_edit,
                 can_delete,
-                mods: mods_exp,
+                mods: expanded ? mods_exp: mods,
                 category,
                 last_played
             } as ProfileExpand;
@@ -306,6 +314,7 @@ export default class DB {
     public async deleteProfile(id: UUID): Promise<void> {
         try {
             await this.profiles.remove({ uuid: id});
+            this.db.emit("update","update");
         } catch (error: any) {
             console.error(`Failed to delete profile ${id}`, error.toString());
         }
@@ -313,6 +322,7 @@ export default class DB {
     public async updateProfile(id: UUID, props: EditableProfileProps): Promise<void> {
         try {
             await this.profiles.update({ uuid: id }, props);
+            this.db.emit("update","update");
         } catch (error: any) {
             console.error(`Failed to update profile ${id}`, error.toString());
         }

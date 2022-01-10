@@ -1,10 +1,13 @@
-import { List, ListItemAvatar, Accordion, AccordionDetails, AccordionSummary, FormControl, InputAdornment, OutlinedInput, Paper, Typography, Avatar, ListItemText, Card, CardContent, CardMedia, Grid, CardActionArea, ListItemButton } from "@mui/material";
-import ManageSearchIcon from '@mui/icons-material/ManageSearch';
+import { Box, List, ListItemAvatar, Accordion, AccordionDetails, AccordionSummary, FormControl,  Paper, Avatar, ListItemText, ListItemButton, CircularProgress } from "@mui/material";
 import AddIcon from '@mui/icons-material/Add';
 import { LinkedButton } from '../LinkedButton';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useEffect, useState } from "react";
-import DB, { CategoryList } from "../../core/db";
+import { CategoryList } from "../../core/db";
+import { load_content } from '../state/getContent';  
+import AppsIcon from '@mui/icons-material/Apps';
+
+type RouteType = { route: "/cdn/mod/" | "/cdn/modpack/" | "/cdn/profile/", type: "mod" | "modpack" | "profile" | "unset" };
 
 function Category(props: { name: string, items: CategoryList[0]["data"], rootPath: string }){
     return (
@@ -16,7 +19,9 @@ function Category(props: { name: string, items: CategoryList[0]["data"], rootPat
                     return (
                         <ListItemButton key={i} component={LinkedButton} to={`${props.rootPath}${item.uuid}`}>
                             <ListItemAvatar sx={{ minWidth: "30px" }}>
-                                <Avatar sx={{ borderRadius: 0, width: 24, height: 24 }} src={item.media.icon ?? undefined}/>
+                                <Avatar sx={{ color:"white", borderRadius: 0, width: 24, height: 24 }} src={item.media.icon ?? undefined}>
+                                    <AppsIcon/>
+                                </Avatar>
                             </ListItemAvatar>
                             <ListItemText>{item.name}</ListItemText>
                         </ListItemButton>
@@ -28,66 +33,37 @@ function Category(props: { name: string, items: CategoryList[0]["data"], rootPat
     );
 }
 
-
-const getPath = (active: string): string => {
-    if(active.includes("modpack")) return "/cdn/modpack/";
-    if(active.includes("mod")) return "/cdn/mod/";
-    if(active.includes("profile")) return "/cdn/profile/";
-    return "mod";
+const getPath = (active: string): RouteType => {
+    if(active.includes("modpack")) return { route: "/cdn/modpack/", type: "modpack"};
+    if(active.includes("profile")) return { route: "/cdn/profile/", type: "profile"};
+    return { route: "/cdn/mod/", type: "mod" };
 }
 export default function ContentSort(){
     const loc = useLocation();
-    const [path,setPath] = useState<string>("");
+    const [path,setPath] = useState<RouteType>({ route: "/cdn/mod/", type: "unset" });
     const [ category, setCategory ] = useState<CategoryList>([]);
+    const [loading,setLoading] = useState<boolean>(true);
 
     useEffect(()=>{
-        const load = async(route: string) => {
-            try {
-                const db = new DB();
-                switch (route) {
-                    case "/cdn/mod/": {
-                        const mods = await db.getModList();
-                        if(mods) setCategory(mods); else setCategory([]);
-                        break;
-                    }
-                    case "/cdn/profile/":{
-                        const mods = await db.getProfileList();
-                        if(mods) setCategory(mods); else setCategory([]);
-                        break;
-                    }
-                    case "/cdn/modpack/":{
-                        const mods = await db.getModpackList();
-                        if(mods) setCategory(mods); else setCategory([]);
-                        break;
-                    }
-                    default:
-                        setCategory([]);
-                        break;
-                }
-            } catch (error: any) {
-                console.error(error);
-            }
-        }
         const route = getPath(loc.pathname);
-        if(route !== path) {
+        if(route.type !== path.type) {
             setPath(route);
-            load(route);
+            load_content(route.type,setCategory,setLoading);
         }
-        console.log(path,loc,category,route);
-    },[loc]);
+    },[loc,path.type]);
 
     return (
         <div id="content-sort">
             <Paper square elevation={4} sx={{paddingLeft: "5px", paddingRight: "5px", paddingTop: "5px"}} id="content-sort-list">
-                <FormControl>
-                    <OutlinedInput startAdornment={
-                        <InputAdornment position="start">
-                            <ManageSearchIcon/>
-                        </InputAdornment>
-                    }></OutlinedInput>
-                    {category.map((value,i)=>{
-                        return <Category key={i} rootPath={path} name={value._id} items={value.data} />
-                    })}
+                <FormControl sx={{ height: "100%" }}>
+                        {
+                            loading ? (
+                                <Box sx={{ width: "100%", height: "100%", display: "flex", justifyContent: "center", flexDirection: "column", alignContent: "center", alignItems: "center" }}>
+                                    <CircularProgress/>
+                                </Box>
+                            ) : category.map(
+                                (value,i)=>(<Category key={i} rootPath={path.route} name={value._id} items={value.data} />))
+                        }
                 </FormControl>
             </Paper>
             <Outlet/>

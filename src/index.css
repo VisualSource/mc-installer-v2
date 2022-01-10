@@ -91,7 +91,7 @@ code {
 #content-install-img {
   height: 228px;
   width: 100%;
-  background: no-repeat;
+  background-repeat: no-repeat;
   background-size: cover;
   background-position: top;
   display: flex;
@@ -126,6 +126,7 @@ code {
   margin-top: 25px;
   display: flex;
   flex-direction: column;
+  overflow-y: scroll;
   gap: 15px;
 }
 #profile-played {
@@ -208,4 +209,11 @@ code {
   height: 100%;
   width: 100%;
   margin-top: 10px;
+}
+
+.activated {
+  color: #29b6f6 !important;
+}
+.activated:hover {
+  background-color: rgba(41, 182, 246, 0.08) !important;
 }
