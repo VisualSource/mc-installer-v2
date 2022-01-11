@@ -2,8 +2,15 @@
   all(not(debug_assertions), target_os = "windows"),
   windows_subsystem = "windows"
 )]
+extern crate crypto;
+extern crate ureq;
 extern crate app_dirs2;
+extern crate os_version;
+#[macro_use]
+extern crate serde_json;
 use app_dirs2::{AppInfo, app_root, AppDataType };
+
+mod minecraft;
 
 const APP_INFO: AppInfo = AppInfo{ name: "MCModInstaller", author: "VisualSource"};
 
