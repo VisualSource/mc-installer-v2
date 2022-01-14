@@ -7,11 +7,11 @@ import reportWebVitals from './reportWebVitals';
 import DB from './core/db';
 import Download from './core/downloads';
 import App from './components/base/App';
+import "./index.sass";
 import './index.css';
 
 window._db = new DB();
 window._downloads = new Download();
-
 
 const theme = createTheme({
   palette: {

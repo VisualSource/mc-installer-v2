@@ -1,9 +1,36 @@
-import {Menu, Button, ButtonTypeMap} from '@mui/material';
+import {Menu, Button, ButtonTypeMap, IconButton, IconButtonTypeMap} from '@mui/material';
 import React, { useState } from 'react';
 
 interface IListButtonProps {
     name?: string;
     btnProps?: ButtonTypeMap<{}, "button">["props"]
+}
+
+interface IListIconButtonProps {
+    btnProps?: IconButtonTypeMap<{}, "button">["props"]
+    icon: any
+}
+
+
+export function ListIconButton(props: React.PropsWithChildren<IListIconButtonProps>) {
+    const [anchor,setAnchor] = useState<HTMLElement | null>(null);
+    const open = Boolean(anchor);
+    const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => setAnchor(event.currentTarget);
+    const handleClose = () => setAnchor(null);
+
+    return (
+        <>
+            <IconButton {...props.btnProps} onClick={handleClick}>
+                {props.icon}
+            </IconButton>
+            <Menu open={open} anchorEl={anchor} onClose={handleClose}>
+                {
+                    //@ts-ignore
+                    props.children && props.children({handleClose})
+                }
+            </Menu>
+        </>
+    );
 }
 
 

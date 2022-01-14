@@ -1,7 +1,7 @@
 import {Db, Collection} from 'zangodb';
 
 export type UUID = string;
-export type Loader = "fabric" | "forge" | "optifine" | "iris";
+export type Loader = "fabric" | "forge" | "optifine" | "iris" | "vanilla";
 export type MCVersion = "1.17.0" | "1.17.1" | "1.17.*" | "1.18.0" | "1.18.1" | "1.18.*";
 
 export interface ILoader {
@@ -151,7 +151,7 @@ export type CategoryList = {
 }[];
 
 export const minecraft_verions: MCVersion[] = ["1.17.0","1.17.1","1.18.1","1.18.0"];
-export const minecraft_loaders: Loader[] = ["fabric","forge","iris","optifine"];
+export const minecraft_loaders: Loader[] = ["fabric","forge","iris","optifine","vanilla"];
 
 export default class DB {
     static INSTANCE: DB | null = null;

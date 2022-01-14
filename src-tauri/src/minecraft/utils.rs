@@ -1,15 +1,16 @@
 extern crate zip;
 extern crate regex;
-use std::path::{Path, PathBuf };
+extern crate lzma_rs;
+use crate::minecraft::exceptions::{ InterialError, WithException};
+use crate::minecraft::command::GameOptions;
+use std::fs::{ read_to_string, create_dir_all, write, read, remove_file, File };
+use std::path::{ Path, PathBuf };
 use std::env::{ consts, var, };
-use std::fs::{read_to_string, create_dir, write, read, remove_file, File };
+use std::io::BufReader;
+use crypto::{ sha1::Sha1, digest::Digest };
 use ureq::{ Agent, AgentBuilder };
-use serde::{Deserialize};
-use crypto::{sha1::Sha1,digest::Digest};
-use serde_json;
-
-use crate::minecraft::exceptions::{InterialError, WithException};
-
+use log::{ info, error, warn };
+use serde::Deserialize;
 
 pub type CallBack = fn(progress: u32, time: u32, size: String);
 
@@ -19,7 +20,8 @@ const USER_AGENT_ID: &str = "mcmodclient/1.0";
 #[derive(Debug)]
 pub enum FileState {
     Download,
-    Exists
+    Exists,
+    ExistsUnchecked
 }
 
 #[allow(non_snake_case)]
@@ -39,6 +41,7 @@ pub struct JsonVersionsData {
     pub minimumLauncherVersion: Option<u32>,
     pub releaseTime: String,
     pub time: String,
+    pub jar: Option<String>,
     pub r#type: String,
 }
 
@@ -99,6 +102,7 @@ pub fn get_minecraft_directory() -> WithException<PathBuf> {
                     Ok(Path::new(&appdata).join(".minecraft"))
                 }
                 Err(err) => {
+                    error!("{}",err);
                     Err(InterialError::boxed(format!("Failed to get APPDATA env variable. | {}", err.to_string())))
                 }
             }
@@ -114,19 +118,20 @@ pub fn get_latest_version() -> WithException<ManifestJsonLastest> {
         Ok(response) => {
             let raw_json: std::io::Result<ManifestJson> = response.into_json();
             match raw_json {
-                Ok(json) => {
-                    Ok(json.latest)
-                }
+                Ok(json) => Ok(json.latest),
                 Err(err) => {
+                    warn!("{}",err);
                     Err(InterialError::boxed(format!("HTTP | Failed to convert body to json | {}", err.to_string())))
                 }
             }
         }
         Err(ureq::Error::Status(code,res)) => {
+            error!("{:?}",res);
             let response = res.into_string().expect("Failed to transform response into a string");
             Err(InterialError::boxed(format!("HTTP ERROR | code: {} | reason: {}",code,response)))
         }
-        Err(_) => {
+        Err(err) => {
+            error!("{}",err);
             Err(InterialError::boxed("HTTP ERROR | UNKNOWN ERROR"))
         }
     }
@@ -138,19 +143,20 @@ pub fn get_version_list() -> WithException<Vec<ManifestJsonVersions>> {
         Ok(response) => {
             let raw_json: std::io::Result<ManifestJson> = response.into_json();
             match raw_json {
-                Ok(json) => {
-                    Ok(json.versions)
-                }
-                Err(err) => {
+                Ok(json) => Ok(json.versions),
+                Err(err) => { 
+                    error!("{}",err);
                     Err(InterialError::boxed(format!("HTTP | Failed to convert body to json | {}", err.to_string())))
                 }
             }
         }
         Err(ureq::Error::Status(code,res)) => {
+            error!("{:?}",res);
             let response = res.into_string().expect("Failed to transform response into a string");
             Err(InterialError::boxed(format!("HTTP ERROR | code: {} | reason: {}",code,response)))
         }
-        Err(_) => {
+        Err(err) => {
+            error!("{}",err);
             Err(InterialError::boxed("HTTP ERROR | UNKNOWN ERROR"))
         }
     }
@@ -161,7 +167,6 @@ pub fn get_installed_versions() -> WithException<Vec<JsonVersionsData>> {
         Ok(dir) => {
             let mut versions_dir = dir;
             versions_dir.push("versions");
-
             match versions_dir.read_dir() {
                 Ok(dir_contents) => {
                     let mut versions: Vec<JsonVersionsData> = vec![];
@@ -180,13 +185,14 @@ pub fn get_installed_versions() -> WithException<Vec<JsonVersionsData>> {
                                 }
                             }
                             Err(err) => {
-                                eprintln!("{}",err);
+                                error!("{}",err);
                             }
                         }
                     }
                     Ok(versions)
                 }
                 Err(err) => {
+                    error!("{}",err);
                     Err(InterialError::boxed(format!("Failed to read dir | {}", err.to_string())))
                 }
             }
@@ -194,6 +200,41 @@ pub fn get_installed_versions() -> WithException<Vec<JsonVersionsData>> {
         Err(err) => Err(err)
     }
 }
+
+/// Returns all installed versions and all all offical versions 
+pub fn get_available_versions() -> WithException<Vec<String>> {
+    let versions: Vec<ManifestJsonVersions> = match get_version_list() {
+        Ok(value) => value,
+        Err(err) => return Err(err)
+    };
+
+    let installed: Vec<JsonVersionsData> = match get_installed_versions() {
+        Ok(value) => value,
+        Err(err) => return Err(err)
+    };
+    let accepted_versions = vec!["1.17".to_string(),"1.18".to_string()];
+
+    let mut version_list: Vec<String> = vec![];
+
+    for i in versions {
+        let id = i.id.clone();
+        for acc in &accepted_versions {
+            if i.id.contains(acc) && i.r#type == "release" {
+                version_list.push(id.clone());
+            }
+        }
+    }
+
+    for i in installed {
+        if version_list.contains(&i.id) {
+            continue;
+        }
+        version_list.push(i.id);
+    }
+
+    Ok(version_list)
+}
+
 /// Tries to find out the path to the default java executable
 pub fn get_java_executable() -> WithException<PathBuf> {
     match consts::OS {
@@ -214,15 +255,19 @@ pub fn get_java_executable() -> WithException<PathBuf> {
                                 if java.is_file() {
                                     Ok(java.to_path_buf())
                                 } else {
+                                    error!("Failed to file java exe");
                                     Err(InterialError::boxed("There are no java exe install"))
                                 }
                             } else {
+                                error!("Failed to file java exe");
                                 Err(InterialError::boxed("There are no java version install in AdoptOpenJDK"))
                             }
                         } else {
+                            error!("Failed to file java exe");
                             Err(InterialError::boxed("Failed to find java exe"))
                         }
                     } else {
+                        error!("Failed to file java exe");
                         Err(InterialError::boxed("Failed to find java exe"))
                     }
                 }
@@ -243,21 +288,22 @@ pub fn get_sha1_hash(path: PathBuf) -> WithException<String> {
             Ok(hasher.result_str())
         }
         Err(err)=>{
-            Err(InterialError::boxed(format!("Failed to read file | {}", err.to_string())))
+            error!("{}",err);
+            Err(InterialError::boxed(format!("SHA1 | Failed to read file | {}", err.to_string())))
         }
     }
 }
 
 /// Downloads a file with given url, path and sha1
-pub fn download_file(url: String, output: PathBuf, /*_callback: CallBack,*/ sha1: Option<String>, _lzma_compressed: bool) -> WithException<FileState> {
-
+pub fn download_file(url: String, output: PathBuf, /*_callback: CallBack,*/ sha1: Option<String>, lzma_compressed: bool) -> WithException<FileState> {
 
     // check if the file directory exits
     if !output.exists() {
         let mut path = output.clone();
         path.pop();
         if !path.exists() {
-            if let Err(err) = create_dir(path) {
+            if let Err(err) = create_dir_all(path) {
+                eprintln!("DOWNLOAD CHECK PATH: {}",err);
                 return Err(InterialError::boxed(format!("Failed to create output path | {}",err.to_string())));
             }
         }
@@ -265,9 +311,10 @@ pub fn download_file(url: String, output: PathBuf, /*_callback: CallBack,*/ sha1
 
     // if exits/has sha1 check if vaild if not remove invaild file.
     if output.exists() && output.is_file() {
-        if let Some(sha) = sha1 {
+        if let Some(sha) = sha1.clone() {
             match get_sha1_hash(output.clone()) {
                 Ok(value) => {
+                    info!("FILE ALREADY EXISTS (SHA1): {:#?}",output.clone());
                     if sha == value {
                         return Ok(FileState::Exists);
                     }
@@ -276,38 +323,83 @@ pub fn download_file(url: String, output: PathBuf, /*_callback: CallBack,*/ sha1
                     return Err(error);
                 }
             };
-        } 
+        } else {
+            warn!("FILE ALREADY EXISTS (NO SHA1): {:#?}",output.clone());
+            return Ok(FileState::ExistsUnchecked);
+        }
 
         if let Err(error) = remove_file(output.clone()) {
-            return Err(InterialError::boxed(format!("Failed to remove invaild file | {}",error.to_string())));
+            error!("DOWNLOAD FILE | {}",error);
+            return Err(InterialError::boxed(format!("DOWNLOAD FILE | Failed to remove invaild file | {}",error.to_string())));
         }  
         
     }
     
     if !url.starts_with("http") {
-        return Err(InterialError::boxed("Invaild url"));
+        error!("Given url is not vaild");
+        return Err(InterialError::boxed("DOWNLOAD FILE | Invaild url"));
     }
 
     match get_user_agent().get(&url).call() {
         Ok(response) => {
             let mut reader = response.into_reader();
-            let mut writer: Vec<u8> = vec![];
+            
+            if lzma_compressed {
+                let mut file = match File::create(output.clone()) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        error!("{}",error);
+                        return Err(InterialError::boxed(error.to_string()));
+                    }
+                };
 
-            if let Err(err) = std::io::copy(&mut reader, &mut writer) {
-                return Err(InterialError::boxed(err.to_string()));
+                let mut f = BufReader::new(reader);
+
+                if let Err(error) = lzma_rs::lzma_decompress(&mut f, &mut file) {
+                    error!("Faild to decompress file | {}",error);
+                    return Err(InterialError::boxed(error.to_string()));
+                }
+
+                info!("DOWNLOADED LZMA FILE {:#?}",output.clone());
+
+            } else {
+                let mut writer: Vec<u8> = vec![];
+
+                if let Err(err) = std::io::copy(&mut reader, &mut writer) {
+                    error!("Failed to write data to buffer | {}",err);
+                    return Err(InterialError::boxed(err.to_string()));
+                }
+
+                if let Err(err) = write(output.clone(), writer) {
+                    error!("Failed to write file | {}",err);
+                    return Err(InterialError::boxed(format!("Failed to write file to system | {}",err.to_string())));
+                }
+
+                warn!("DOWNLOADED RAW FILE {:#?}",output.clone());
             }
 
-            if let Err(err) = write(output.clone(), writer) {
-                return Err(InterialError::boxed(format!("Failed to write file to system | {}",err.to_string())));
+            if let Some(sha) = sha1 {
+                match get_sha1_hash(output.clone()) {
+                    Ok(value) => {
+                        if sha == value {
+                            return Ok(FileState::Download);
+                        }
+                    }
+                    Err(error) => {
+                        return Err(error);
+                    }
+                };
             }
 
             return Ok(FileState::Download);
         }
         Err(ureq::Error::Status(code,res)) => {
+            error!("Http Error | {:?}",res);
             let response = res.into_string().expect("Failed to transform response into a string");
             return Err(InterialError::boxed(format!("HTTP ERROR | Code: {} | Res: {}",code,response)));
         }
-        Err(_) => {
+        Err(error) => {
+            error!("Http error | {}",error);
             return Err(InterialError::boxed("HTTP ERROR | TRANSPORT ERROR"));
         }
     }
@@ -317,7 +409,7 @@ pub fn download_file(url: String, output: PathBuf, /*_callback: CallBack,*/ sha1
 pub fn get_jar_mainclass(path: PathBuf) -> WithException<String> {
     use std::io::Read;
  
-    match File::open(path) {
+    match File::open(path.clone()) {
         Ok(file) => {
             if let Ok(mut value) = zip::ZipArchive::new(file) {
                 if let Ok(mut manifest) = value.by_name("META-INF/MANIFEST.MF") {
@@ -327,8 +419,6 @@ pub fn get_jar_mainclass(path: PathBuf) -> WithException<String> {
                     let remove_sep = buffer.replace(":"," ");
 
                     let v: Vec<&str> = remove_sep.split_whitespace().collect();
-
-                    println!("{:#?}",v);
 
                     let mut main_index = 0;
 
@@ -342,20 +432,23 @@ pub fn get_jar_mainclass(path: PathBuf) -> WithException<String> {
                         return Ok(String::from(v[main_index]));
                     }
 
+                    error!("Failed to get Main-Class from {:?}", path.clone());
                     return Err(InterialError::boxed("Failed to get Main-Class"));
                 }
             }
-        
-           Err(InterialError::boxed("Failed to find META-INF/MANIFEST.MF"))
+            
+            error!("Failed to find META-INF/MANIFEST.MF from {:?}", path.clone());
+            Err(InterialError::boxed("Failed to find META-INF/MANIFEST.MF"))
         }
         Err(error) => {
+            error!("{}",error);
             Err(InterialError::boxed(format!("Failed to read file | {}",error.to_string())))
         }
     }
 }
 
 /// Parse a single rule from versions.json in .minecraft
-pub fn parse_single_rule(rule: &serde_json::Value, options: &serde_json::Value) -> bool {
+pub fn parse_single_rule(rule: &serde_json::Value, options: &mut GameOptions) -> bool {
  
     if !rule.is_object() {
         return false;
@@ -399,10 +492,10 @@ pub fn parse_single_rule(rule: &serde_json::Value, options: &serde_json::Value) 
 
     if let Some(features) = rule.get("features") {
         for (key,_) in features.as_object().expect("Features was not a object").iter() {
-            if key == "has_custom_resolution" && options.get("customResolution").is_some() {
+            if key == "has_custom_resolution" && options.custom_resolution.is_some() {
                 return result;
             }
-            if key == "is_demo_user" && options.get("demo").is_some() {
+            if key == "is_demo_user" && options.demo.is_some() {
                 return result;
             }
         }
@@ -412,10 +505,10 @@ pub fn parse_single_rule(rule: &serde_json::Value, options: &serde_json::Value) 
 }
 
 // Parse rule list
-pub fn parse_rule_list(data: &serde_json::Value, rule_string: &str, options: &serde_json::Value) -> bool {
+pub fn parse_rule_list(data: &serde_json::Value, rule_string: &str, options: &mut GameOptions) -> bool {
     if let Some(rules) = data.get(rule_string) {
-        for i in rules.as_object().expect("Expexted data to be a object").values() {
-            if !parse_single_rule(i, &options) {
+        for i in rules.as_array().expect("Expexted data to be a object") {
+            if !parse_single_rule(i, options) {
                 return false;
             }
         }
@@ -443,24 +536,27 @@ pub fn inherit_json(original_data: &JsonVersionsData, path: &PathBuf) -> WithExc
         r#type: original_data.r#type.clone(),
         mainClass: original_data.mainClass.clone(),
         arguments: original_data.arguments.clone(), //
-        libraries: original_data.libraries.clone(), //
+        libraries: original_data.libraries.clone(),
+        jar: original_data.jar.clone(),
         assetIndex: None,
         assets: None,
         javaVersion: None,
         downloads: None,
         complianceLevel: None,
         logging: None,
-        minimumLauncherVersion: None
+        minimumLauncherVersion: None,
     };
 
 
 
     let version_path = path.join("versions").join(inherit_version.clone()).join(format!("{}.json",inherit_version));
-    let raw = if let Ok(value) = read_to_string(version_path) { value } else {
+    let raw = if let Ok(value) = read_to_string(version_path.clone()) { value } else {
+        error!("Failed to open inherited version from file | {:?}",version_path);
         return Err(InterialError::boxed("Failed to open inherited version file."));
     };
 
     let inherit_data: JsonVersionsData = if let Ok (data) = serde_json::from_str(&raw) { data } else {
+        error!("Failed to read data into struct");
         return Err(InterialError::boxed("Failed to transform data"));
     }; 
 
@@ -492,8 +588,6 @@ pub fn inherit_json(original_data: &JsonVersionsData, path: &PathBuf) -> WithExc
         arguments_game.push(arg.to_owned());
     }
 
-   
-
     Ok(new_data)
 }
 
@@ -505,6 +599,44 @@ pub fn get_libary_path(name: String, path: PathBuf) -> PathBuf {
     unimplemented!();
 }
 
+pub fn is_version_vaild(version: String, mc_dir: PathBuf) -> WithException<bool> {
+
+    let v_path = mc_dir.join("versions").join(version.clone());
+
+    if v_path.is_dir() {
+        return Ok(true)
+    }   
+
+    match get_version_list() {
+        Ok(value) => {
+            for v in value {
+                if v.id == version {
+                    return Ok(true)
+                }
+            }
+            return Ok(false)
+        }
+        Err(err) => {
+            return Err(err)
+        }
+    } 
+}
+
+
+
+#[test]
+fn test_get_available_verions() {
+    match get_available_versions() {
+        Ok(value) => {
+            println!("{:#?}",value);
+        }
+        Err(err) => {
+            eprintln!("{}",err);
+        }
+    }
+}
+
+
 #[test]
 fn test_pase_single_rule() {
     let rule = json!({
@@ -513,9 +645,9 @@ fn test_pase_single_rule() {
             "arch": "x86"
         }
     });
-    let options = json!({});
+    let mut options = GameOptions::default();
 
-    let res = parse_single_rule(&rule, &options);
+    let res = parse_single_rule(&rule, &mut options);
     println!("RULE RES: {}",res);
 }
 
@@ -603,13 +735,9 @@ fn test_get_java_executable(){
     }
 }
 
-fn test_callback(progress: u32, time: u32, size: String){
-    println!("{} {} {}",progress,time,size);
-}
-
 #[test]
 fn test_get_sha1() {
-    let path = PathBuf::from("C:\\projects\\optifineheadless.jar");
+    let path = PathBuf::from("C:\\projects\\mc-installer-v2\\src-tauri\\forge-installer-headless-1.0.1.jar");
     match get_sha1_hash(path) {
         Ok(sha1) => {
             println!("{}",sha1);
@@ -625,6 +753,21 @@ fn test_download_file() {
     let path = PathBuf::from("C:\\projects\\optifineheadless.jar");
     
     match download_file(url,path,sha1,false) {
+        Ok(value) => println!("{:#?}",value),
+        Err(err)=>{
+            eprintln!("{}",err);
+        }
+    }
+}
+
+#[test]
+fn test_download_file_compressed() {
+
+    let sha1 = Some("a8ba78ede03aac58a1a5615780b0d600ba143198".to_string());
+    let url = "https://launcher.mojang.com/v1/objects/a8ba78ede03aac58a1a5615780b0d600ba143198/javaw.exe".to_string();
+    let path = PathBuf::from("C:\\projects\\mc-installer-v2\\src-tauri\\javaw.exe");
+    
+    match download_file(url,path,sha1,true) {
         Ok(value) => println!("{:#?}",value),
         Err(err)=>{
             eprintln!("{}",err);

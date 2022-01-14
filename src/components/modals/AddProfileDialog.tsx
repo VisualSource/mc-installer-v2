@@ -1,11 +1,12 @@
 import { Tooltip, FormControlLabel, Checkbox, Button, Dialog, DialogActions, DialogContent, InputLabel, MenuItem, Select, FormControl, DialogTitle, TextField, Typography, List, ListItemButton, ListItem, Box, IconButton } from "@mui/material";
 import { useRecoilState, useSetRecoilState } from "recoil";
-import DB, {Loader, MCVersion, minecraft_loaders,minecraft_verions} from '../../core/db';
+import DB, {Loader, MCVersion, minecraft_loaders} from '../../core/db';
 import { add_profile_dialog, message_dialog } from "../state/stateKeys";
 import DeleteIcon from '@mui/icons-material/Delete';
 import InfoIcon from '@mui/icons-material/Info';
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { nanoid } from "nanoid";
+import { get_fabric_verions, get_forge_verions  } from '../../core/cmds';
 
 export function capitalize(value: string): string {
     return value[0].toUpperCase() + value.toLowerCase().substring(1);
@@ -14,6 +15,7 @@ export function capitalize(value: string): string {
 export default function AddProfileDialog(){
     const setMessage = useSetRecoilState(message_dialog);
     const [show,setShow] = useRecoilState(add_profile_dialog);
+    const [versions_list,setVersionsList] = useState<string[]>([]);
     const [links,setLinks] = useState<{ path: string, name: string }[]>([]);
     const [linkName,setLinkName] = useState<string>("");
     const [linkPath,setLinkPath] = useState<string>("");
@@ -28,6 +30,35 @@ export default function AddProfileDialog(){
     const [allowDelete,setAllowDelete] = useState<boolean>(true);
     const [name,setName] = useState<string>("");
     const handleClose = () => setShow(false);
+
+
+    useEffect(()=>{
+        const run = async () => {
+            try {
+                switch (loader) {
+                    case "fabric": {
+                        let verisons = await get_fabric_verions();
+                        setVersionsList(verisons.versions.map(value=>value.version));
+                        break;
+                    }
+                    case "forge": {
+                        let versions = await get_forge_verions();
+                        setVersionsList(versions.versions);
+                        break;
+                    }
+                    case "vanilla": {
+                        break;
+                    }
+                    default: {
+                        break;
+                    }
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
+        run();
+    },[loader]);
 
     const createProfile = async () => {
         try {
@@ -141,7 +172,7 @@ export default function AddProfileDialog(){
                     <FormControl sx={{ marginTop: "10px" }}>
                         <InputLabel id="profile-mc">Minecraft</InputLabel>
                         <Select value={mcv} onChange={event=>setMCV(event.target.value as MCVersion)} label="Minecraft" labelId="profile-mc" id="mc">
-                            {minecraft_verions.map((version,i)=>(
+                            {versions_list.map((version,i)=>(
                                 <MenuItem value={version} key={i}>{version}</MenuItem>
                             ))}
                         </Select>

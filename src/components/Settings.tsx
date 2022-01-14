@@ -12,9 +12,6 @@ export default function Settings(){
                     <ListItemButton component={LinkedButton} to="/settings/downloads">
                         DOWNLOADS
                     </ListItemButton>
-                    <ListItemButton component={LinkedButton} to="/settings/installs">
-                        INSTALLS
-                    </ListItemButton>
                     <ListItemButton component={LinkedButton} to="/settings/minecraft">
                         MINECRAFT
                     </ListItemButton>

@@ -1,4 +1,4 @@
-import {Paper, MenuItem, Avatar, Button, IconButton, Divider } from '@mui/material';
+import {Paper, MenuItem, Avatar, Button, IconButton, Divider, Box } from '@mui/material';
 import MinimizeIcon from '@mui/icons-material/Minimize';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import DraftsIcon from '@mui/icons-material/Drafts';
@@ -24,9 +24,9 @@ export default function Header(){
     },[]);
 
     return (
-        <Paper elevation={2} component="header" square data-tauri-drag-region> 
-            <div id="header-appbar" data-tauri-drag-region>
-                <ListButton name="File" btnProps={{ size: "small", sx: {borderRadius: 0} }}>
+        <Paper elevation={2} component="header" square data-tauri-drag-region id="app-header"> 
+            <Box data-tauri-drag-region id="app-header-controls">
+                <ListButton name="File" btnProps={{ size: "small", sx: { borderRadius: 0} }}>
                     {({handleClose}: any)=>[
                             <MenuItem key={0} onClick={()=>{ handleClose(); naviagate("/"); }}>Home</MenuItem>,
                             <Divider key={1}/>,
@@ -36,24 +36,24 @@ export default function Header(){
                         ]
                     }
                 </ListButton>
-                <div id="header-btns-right" data-tauri-drag-region>
+                <Box data-tauri-drag-region id="app-header-userinfo">
                     <ListButton btnProps={{ sx: { borderRadius: 0, marginRight: "20px" }, children: [<DraftsIcon key={0}/>], size: "small" }}>
                         {({handleClose}: any)=> [
                                 <MenuItem key={1} onClick={()=>{ handleClose(); naviagate("/downloads"); }}>Updates</MenuItem>
                             ]
                         }
                     </ListButton>
-                    <div id="header-user">
+                    <Box id="app-header-acccount-select">
                         <Avatar variant="square" sx={{ color: "white", width: 31, height: 31 }}/>
                         <ListButton name="USERNAME" btnProps={{ sx: { borderRadius: 0  }, variant:"outlined", color: "primary", size: "small", endIcon: <KeyboardArrowDownIcon/> }}>
                             {({handleClose}: any)=> [
-                                <MenuItem key={1} onClick={()=>{ handleClose(); naviagate("/settings"); }}>Account</MenuItem>,
+                                <MenuItem key={1} onClick={()=>{ handleClose(); naviagate("/settings"); }}>Accounts</MenuItem>,
                                 <Divider key={3}/>,
                                 <MenuItem key={2} onClick={handleClose}>Logout: USERNAME</MenuItem>
                                    
                             ]}
                         </ListButton>
-                    </div>
+                    </Box>
                     <IconButton color="primary" sx={{ borderRadius: 0, marginLeft: "25px" }} onClick={()=>appWindow.minimize()} size="small">
                         <MinimizeIcon/>
                     </IconButton>
@@ -63,13 +63,13 @@ export default function Header(){
                     <IconButton color="error" sx={{ borderRadius: 0 }} onClick={()=>appWindow.close()} size="small">
                         <CloseIcon/>
                     </IconButton>
-                </div>
-            </div>
-            <div data-tauri-drag-region>
-                <Button size="large" isActiveLink component={LinkedButton} to="/cdn/mods">MODS</Button>
-                <Button size="large" isActiveLink component={LinkedButton} to="/cdn/modpacks">MOD PACKS</Button>
-                <Button size="large" isActiveLink component={LinkedButton} to="/cdn/profiles">PROFILES</Button>
-            </div>
+                </Box>
+            </Box>
+            <Box data-tauri-drag-region>
+                <Button size="large" isactivelink component={LinkedButton} to="/cdn/mods">MODS</Button>
+                <Button size="large" isactivelink component={LinkedButton} to="/cdn/modpacks">MOD PACKS</Button>
+                <Button size="large" isactivelink component={LinkedButton} to="/cdn/profiles">PROFILES</Button>
+            </Box >
         </Paper>
     );
 }

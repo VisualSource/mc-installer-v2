@@ -7,8 +7,11 @@ export default function SettingsMinecraft(){
                 <Typography variant="h2" >- Minecraft -</Typography>
             </Box>
             <FormGroup>
-                <TextField id="outlined-basic" label="minecraft lancher exe" variant="outlined" />
+                <TextField id="outlined-basic" label="java exc" variant="outlined" />
                 <TextField id="outlined-basic" label="minecaft jar flags" variant="outlined" />
+            </FormGroup>
+            <FormGroup>
+                <TextField id="outlined-basic" label=".minecraft directory" variant="outlined" />
             </FormGroup>
         </Container>
     );
