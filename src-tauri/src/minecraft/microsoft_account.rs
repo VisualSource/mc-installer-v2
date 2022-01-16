@@ -1,26 +1,28 @@
 use crate::minecraft::exceptions::{ WithException, InterialError };
 use crate::minecraft::utils::get_user_agent;
 use serde::{Deserialize, Serialize};
-use log::{ error };
+use log::{ error, debug };
 
-#[derive(Deserialize)]
+const MS_TOKEN_AUTHORIZATION_URL: &str = "https://login.live.com/oauth20_token.srf";
+
+#[derive(Deserialize, Debug)]
 struct OAuth2LoginJson {
     access_token: Option<String>,
     refresh_token: Option<String>,
     error: Option<String>
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct XboxLineCliamsItem {
     uhs: String
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct XboxLiveClaims {
     xui: Vec<XboxLineCliamsItem>
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
  struct XboxLiveJson {
     #[serde(rename="Token")]
     token: String,
@@ -28,18 +30,18 @@ struct XboxLiveClaims {
     display_claims: XboxLiveClaims
  }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct XSTSJson {
     #[serde(rename="Token")]
     token: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct MinecraftJson {
     access_token: String
 }
 
-#[derive(Deserialize,Serialize, Clone)]
+#[derive(Deserialize,Serialize, Clone, Debug)]
 pub struct PlayerProfile {
     pub id: String,
     pub name: String,
@@ -97,7 +99,7 @@ pub fn get_auth_code_from_url(url: String) -> WithException<String> {
    Ok(token.to_owned())
 }
 
-
+/// Returns ms authorization token
 fn get_authorization_token(client_id: String, client_secret: String, redirect_uri: String, auth_code: String) -> WithException<OAuth2LoginJson> {
     let agent = get_user_agent();
 
@@ -110,12 +112,15 @@ fn get_authorization_token(client_id: String, client_secret: String, redirect_ur
     ];
 
     match agent
-    .post("https://login.live.com/oauth20_token.srf")
+    .post(MS_TOKEN_AUTHORIZATION_URL)
     .set("Content-Type", "application/x-www-form-urlencoded")
     .send_form(&payload) {
         Ok(value) => {
+            debug!("{:#?}",value);
             match value.into_json::<OAuth2LoginJson>() {
-                Ok(json) => Ok(json),
+                Ok(json) => {
+                    Ok(json)
+                },
                 Err(err) => {
                     error!("{}",err);
                     Err(InterialError::boxed("Failed to tranfrom data"))
@@ -130,6 +135,7 @@ fn get_authorization_token(client_id: String, client_secret: String, redirect_ur
 
 }
 
+/// Returns ms authorization token
 fn refresh_authorization_token(client_id: String, client_secret: String, redirect_uri: String, refresh_token: String) -> WithException<OAuth2LoginJson> {
     let agent = get_user_agent();
     let payload = json!({
@@ -140,7 +146,7 @@ fn refresh_authorization_token(client_id: String, client_secret: String, redirec
         "grant_type": "refresh_token"
     });
 
-    match agent.post("https://login.live.com/oauth20_token.srf").send_json(payload) {
+    match agent.post(MS_TOKEN_AUTHORIZATION_URL).send_json(payload) {
         Ok(value) => {
             match value.into_json::<OAuth2LoginJson>() {
                 Ok(json) => Ok(json),
@@ -164,8 +170,8 @@ fn authenticate_with_xbl(access_token: String) -> WithException<XboxLiveJson> {
     let payload = json!({
         "Properties": {
             "AuthMethod": "RPS",
-            "SiteName": "user.aut.xboxlive.com",
-            "RpsTicket": format!("f={}",access_token)
+            "SiteName": "user.auth.xboxlive.com",
+            "RpsTicket": format!("d={}",access_token).to_string()
         },
         "RelyingParty": "http://auth.xboxlive.com",
         "TokenType": "JWT"
@@ -177,6 +183,7 @@ fn authenticate_with_xbl(access_token: String) -> WithException<XboxLiveJson> {
     .set("Accept","application/json")
     .send_json(payload) {
         Ok(value) => {
+            debug!("{:#?}",value);
             match value.into_json::<XboxLiveJson>() {
                 Ok(json) => Ok(json),
                 Err(err) => {
@@ -198,7 +205,7 @@ fn authenticate_width_xsts(xbl_token: String) -> WithException<XSTSJson> {
 
     let payload = json!({
         "Properties": {
-            "SanboxId": "RETAIL",
+            "SandboxId": "RETAIL",
             "UserTokens": [
                 xbl_token
             ]
@@ -213,6 +220,7 @@ fn authenticate_width_xsts(xbl_token: String) -> WithException<XSTSJson> {
     .set("Accept", "application/json")
     .send_json(payload) {
         Ok(value) => {
+            debug!("{:#?}",value);
             match value.into_json::<XSTSJson>() {
                 Ok(json) => Ok(json),
                 Err(err) => {
@@ -231,7 +239,7 @@ fn authenticate_width_xsts(xbl_token: String) -> WithException<XSTSJson> {
 fn authenticate_with_minecraft(userhash: String, xsts_token: String) -> WithException<MinecraftJson> {
     let agent: ureq::Agent = get_user_agent();
     let payload = json!({
-        "identityToken": format!("XBL3.0 x={};{}",userhash,xsts_token)
+        "identityToken": format!("XBL3.0 x={};{}",userhash,xsts_token).to_string()
     });
 
     match agent
@@ -240,6 +248,7 @@ fn authenticate_with_minecraft(userhash: String, xsts_token: String) -> WithExce
     .set("Accept", "application/json")
     .send_json(payload) {
         Ok(value) => {
+            debug!("{:#?}",value);
             match value.into_json::<MinecraftJson>() {
                 Ok(json) => Ok(json),
                 Err(err) => {
@@ -258,8 +267,10 @@ fn authenticate_with_minecraft(userhash: String, xsts_token: String) -> WithExce
 fn get_profile(token: String) -> WithException<PlayerProfile> {
     let agent: ureq::Agent = get_user_agent();
 
-    match agent.get("https://api.minecraftservices.com/minecraft/profile").set("Authorization", format!("Bearer {}",token).as_str()).call() {
+    match agent.get("https://api.minecraftservices.com/minecraft/profile")
+    .set("Authorization", format!("Bearer {}",token).as_str()).call() {
         Ok(value) => {
+            debug!("{:#?}",value);
             match value.into_json::<PlayerProfile>() {
                 Ok(value) => Ok(value),
                 Err(err) => {
@@ -310,7 +321,6 @@ pub fn complete_login(client_id: String, client_secret: String, redirect_uri: St
 
     Ok(profile)
 }
-
 
 pub fn complete_refresh(client_id: String, client_secret: String, redirect_uri: String, refresh_token: String) -> WithException<PlayerProfile> {
 

@@ -6,7 +6,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import InfoIcon from '@mui/icons-material/Info';
 import { useEffect, useState } from "react";
 import { nanoid } from "nanoid";
-import { get_fabric_verions, get_forge_verions  } from '../../core/cmds';
+import { fetchVerions } from '../../core/cmds';
 
 export function capitalize(value: string): string {
     return value[0].toUpperCase() + value.toLowerCase().substring(1);
@@ -25,34 +25,19 @@ export default function AddProfileDialog(){
     const [category,setCategory] = useState<string>("General");
     const [description,setDescription] = useState<string>("");
     const [mcv,setMCV] = useState<MCVersion>("1.18.1");
-    const [loader,setLoader] = useState<Loader>("fabric");
+    const [loader,setLoader] = useState<Loader>("vanilla");
     const [allowEdit,setAllowEdit] = useState<boolean>(true);
     const [allowDelete,setAllowDelete] = useState<boolean>(true);
     const [name,setName] = useState<string>("");
     const handleClose = () => setShow(false);
 
-
     useEffect(()=>{
         const run = async () => {
             try {
-                switch (loader) {
-                    case "fabric": {
-                        let verisons = await get_fabric_verions();
-                        setVersionsList(verisons.versions.map(value=>value.version));
-                        break;
-                    }
-                    case "forge": {
-                        let versions = await get_forge_verions();
-                        setVersionsList(versions.versions);
-                        break;
-                    }
-                    case "vanilla": {
-                        break;
-                    }
-                    default: {
-                        break;
-                    }
-                }
+                const data = await fetchVerions(loader);
+                setVersionsList(data.versions);
+                setMCV(data.versions[0] as MCVersion);
+                if(name.length === 0) setName(`Minecraft ${loader}-${mcv}`);
             } catch (error) {
                 console.error(error);
             }

@@ -17,18 +17,16 @@ function Category(props: { name: string, items: CategoryList[0]["data"], rootPat
         <AccordionSummary expandIcon={<AddIcon/>} >{props.name.toUpperCase()} ({props.items.length})</AccordionSummary>
         <AccordionDetails>
             <List dense sx={{ padding: 0 }}>
-                {props.items.map((item,i)=>{
-                    return (
-                        <ListItemButton key={i} component={LinkedButton} to={`${props.rootPath}${item.uuid}`}>
-                            <ListItemAvatar sx={{ minWidth: "30px" }}>
-                                <Avatar sx={{ color:"white", borderRadius: 0, width: 24, height: 24 }} src={item.media.icon ?? undefined}>
-                                    <AppsIcon/>
-                                </Avatar>
-                            </ListItemAvatar>
-                            <ListItemText>{item.name}</ListItemText>
-                        </ListItemButton>
-                    );
-                })}
+                {props.items.map((item,i)=> (
+                    <ListItemButton key={i} component={LinkedButton} to={`${props.rootPath}${item.uuid}`}>
+                        <ListItemAvatar sx={{ minWidth: "30px" }}>
+                            <Avatar sx={{ color:"white", borderRadius: 0, width: 24, height: 24 }} src={item.media.icon ?? undefined}>
+                                <AppsIcon/>
+                            </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText>{item.name}</ListItemText>
+                    </ListItemButton>
+                ))}
             </List>
         </AccordionDetails>
     </Accordion>
@@ -74,7 +72,7 @@ export default function ContentSort(){
                         }
                 </FormControl>
             </Paper>
-            <Box>
+            <Box sx={{ width: "100%", height: "100%"}}>
                 <Outlet/>
             </Box>
         </Box>

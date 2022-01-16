@@ -9,10 +9,11 @@ pub mod utils;
 pub mod natives;
 pub mod runtime;
 pub mod command;
-pub mod mojang_account;
 pub mod microsoft_account;
 pub mod install;
 pub mod fabric;
 pub mod forge;
+pub mod iris;
+pub mod optifine;
 
 

@@ -37,38 +37,7 @@ code {
 }
 
 
-#content-install-img {
-  height: 228px;
-  width: 100%;
-  background-repeat: no-repeat;
-  background-size: cover;
-  background-position: top;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
 
-#content-install-img > h6 {
-  margin: 0 15px 0 10px;
-}
-#content-install {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-}
-#content-install-actions {
-  height: 65px;
-  display: flex;
-  justify-content: flex-start;
-  align-content: center;
-  align-items: center;
-  padding-left: 10px;
-  gap: 15px;
-}
-#content-install-info {
-  display: flex;
-  height: 100%;
-}
 #install-desc {
   height: 100%;
   width: 100%;

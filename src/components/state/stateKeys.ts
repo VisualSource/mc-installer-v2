@@ -43,3 +43,16 @@ export const modpack_install_dialog = atom<{show: boolean; pack: string | null}>
         pack: null
     }
 });
+
+
+export interface MSAccounts {
+    active: boolean
+    uuid: string;
+    email: string;
+    username: string;
+}
+
+export const ms_accounts = atom<MSAccounts[]>({
+    key: "MS_ACCOUNTS",
+    default: []
+}); 

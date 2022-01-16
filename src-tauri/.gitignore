@@ -3,3 +3,4 @@
 /target/
 WixTools
 launcher.txt
+.env

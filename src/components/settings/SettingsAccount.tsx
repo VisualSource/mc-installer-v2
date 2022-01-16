@@ -1,9 +1,10 @@
 import { Container, Typography, Button, Box, List, ListItem, ListItemText, Chip, MenuItem } from "@mui/material";
-import {login_microsoft, login_mojang} from '../../core/cmds';
+import { login_microsoft } from '../../core/cmds';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import { ListIconButton } from "../ListButton";
 import { useState } from "react";
-
+import { ms_accounts } from '../state/stateKeys';
+import { useRecoilState } from "recoil";
 
 function AccountOptions({ uuid, active, mc }: { mc: boolean, uuid: string, active: boolean }) {
     return (
@@ -28,64 +29,42 @@ function Account({ uuid, username, email, active = false, mc = false }: { mc?: b
     );
 }
 
-interface Accounts {
-    microsoft: {
-        active: boolean
-        uuid: string;
-        email: string;
-        username: string;
-    }[]
-    mojang: {
-        active: boolean
-        uuid: string;
-        email: string;
-        username: string;
-    }[]
-    visualsource: {
-        active: boolean
-        uuid: string;
-        email: string;
-        username: string;
-    }[]
-}
-
 export default function SettingsAccount(){
-    let [accounts,setAccounts] = useState<Accounts>({
-        microsoft: [{ active: true, uuid: "", email: "boomishere_network@outlook.com", username: "VisaulSource" }],
-        mojang: [{active: false, uuid: "", email: "collin_blosser@yahoo.com", username: "VisualSource" }],
-        visualsource: [{ active: false, uuid: "", email: "boomishere_network@outlook.com", username: "VisualSource" }]
-    });
+    const [msa,setMSA] = useRecoilState(ms_accounts);
+    const [auth,_] = useState({ isAuth: true,  user: { sub: "", username: "VisualSource", email: "boomishere_network@outlook.com" } });
+
+    const ms_login = async () => {
+        try {
+            const user =  await login_microsoft();
+            if(!user) throw new Error("Login failed");
+            setMSA([...msa,user]);
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
     return (
         <Container className="add-options" sx={{ overflowY: "scroll", height:"100%", display: "flex", flexDirection: "column", marginTop: "1em", marginBottom: "1em" }}>
-            <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
+            <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}> 
                 <Typography variant="h4" >- ACCOUNT -</Typography>
             </Box>
             <Box sx={{ marginBottom: "15px" }}>
                 <Typography variant="h5">Microsoft</Typography>
                 <List dense sx={{ marginBottom: "10px" }}>
-                    {accounts.microsoft.map((value,i)=>(
+                    {msa.map((value,i)=>(
                         <Account mc username={value.username} email={value.email} active={value.active} uuid={value.uuid}/>
                     ))}
                 </List>
-                <Button variant="outlined" color="inherit" onClick={login_microsoft}>Add Microsoft Account</Button>
-            </Box>
-            <Box sx={{ marginTop: "10px", marginBottom: "15px" }}>
-                <Typography variant="h5">Mojang</Typography>
-                <List dense sx={{ marginBottom: "10px" }}>
-                    {accounts.mojang.map((value,i)=>(
-                        <Account mc username={value.username} email={value.email} active={value.active} uuid={value.uuid}/>
-                    ))}
-                </List>
-                <Button variant="outlined" color="inherit" onClick={login_mojang}>Add Mojang Account</Button>
+                <Button variant="outlined" color="inherit" onClick={ms_login}>Add Microsoft Account</Button>
             </Box>
             <Box sx={{ marginTop: "10px" }}>
                 <Typography variant="h5">VisualSource</Typography>
                 <List dense sx={{ marginBottom: "15px" }} >
-                    {accounts.visualsource.map((value,i)=>(
-                        <Account username={value.username} email={value.email} active={value.active} uuid={value.uuid}/>
-                    ))}
+                    {
+                        auth.isAuth ? <Account username={auth.user.username} email={auth.user.email} active={false} uuid={auth.user.sub}/> : null
+                    }
                 </List>
-                <Button variant="outlined" color="inherit">Add VisualSource Account</Button>
+                <Button variant="outlined" color="inherit">Login to Account</Button>
             </Box>
         </Container>
     );

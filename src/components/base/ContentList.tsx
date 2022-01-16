@@ -21,23 +21,25 @@ export default function ContentList(props: { type: "mod" | "profile" | "modpack"
     );
 
     return (
-        <Grid container spacing={1} id="content-list">
-            {content.map((cat,i)=>{
-                return cat.data.map((value,j)=>{
-                    return (
-                        <Grid item key={`${i}_${j}`}>
-                            <Card sx={{ maxWidth: 200, maxHeight: 250 }}>
-                                <CardActionArea onClick={()=>naviage(`/cdn/${props.type}/${value.uuid}`)}>
-                                    <CardMedia height={200} image={value.media.list ?? BackgroundImage} component="img"/>
-                                    <CardContent>
-                                        <Typography>{value.name}</Typography>
-                                    </CardContent>
-                                </CardActionArea>
-                            </Card>
-                        </Grid>
-                    );
-                });
-            }).flat()}
-        </Grid>
+        <Box id="content-list">
+             <Grid container spacing={1}>
+                {content.map((cat,i)=>{
+                    return cat.data.map((value,j)=>{
+                        return (
+                            <Grid item key={`${i}_${j}`} sx={{ display: "flex", justifyContent: "center", alignContent: "stretch", alignItems: "stretch", }}>
+                                <Card sx={{ maxWidth: 185, maxHeight: 250 }}>
+                                    <CardActionArea sx={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-start" }} onClick={()=>naviage(`/cdn/${props.type}/${value.uuid}`)}>
+                                        <CardMedia height={125} image={value.media.list ?? BackgroundImage} component="img"/>
+                                        <CardContent>
+                                            <Typography>{value.name}</Typography>
+                                        </CardContent>
+                                    </CardActionArea>
+                                </Card>
+                            </Grid>
+                        );
+                    });
+                }).flat()}
+            </Grid>
+        </Box>
     );
 }

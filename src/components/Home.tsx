@@ -5,7 +5,7 @@ import {get_minecraft_news, MinecraftNews } from '../core/cmds';
 
 function NewsCard(item: MinecraftNews) {
     return (
-    <Card sx={{ maxWidth: 250 }}>
+    <Card sx={{ maxWidth: 225 }}>
         <CardActionArea target="_blank" component="a" href={`https://www.minecraft.net${item.article_url}`}>
             <CardMedia component="img" height="140" image={`https://www.minecraft.net${item.default_tile.image.imageURL}`} alt={item.default_tile.image.alt ?? "news"} />
             <CardContent>
@@ -16,7 +16,6 @@ function NewsCard(item: MinecraftNews) {
     </Card>
     );
 }
-
 
 export default function Home(){
     const [content, setContent] = useState<MinecraftNews[]>([]);
@@ -49,12 +48,14 @@ export default function Home(){
         <Container id="app-home">
             <Typography sx={{ marginTop: "15px" }} variant="h3">Minecraft News and Guides</Typography>
             <Box id="app-home-news" sx={{ marginTop: "1em", marginBottom: "1em" }}>
-                <Grid container sx={{ height: "100%", gap: "0.5em", marginTop: "20px", marginBottom: "20px" }}>
-                    {content.map((card,i)=>(
-                        <Grid item sx={{ gap: "0.5em", display: "flex", alignContent: "stretch", alignItems: "stretch", maxHeight: "325px" }}>
-                            <NewsCard key={i} {...card} />
+                <Grid container sx={{ height: "100%", gap: "0.5em", marginTop: "20px", marginBottom: "20px", justifyContent: "center" }}>
+                    { content.length > 0 ? content.map((card,i)=>(
+                        <Grid key={i} item sx={{ gap: "0.5em", display: "flex", justifyContent: "center", alignContent: "stretch", alignItems: "stretch", maxHeight: "325px" }}>
+                            <NewsCard {...card} />
                         </Grid>
-                    ))}
+                    )): (
+                        <Box>Failed to load content. Try again later</Box>
+                    )}
                 </Grid>
             </Box>
         </Container>
