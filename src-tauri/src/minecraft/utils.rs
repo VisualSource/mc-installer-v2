@@ -9,7 +9,7 @@ use std::env::{ consts, var, };
 use std::io::BufReader;
 use crypto::{ sha1::Sha1, digest::Digest };
 use ureq::{ Agent, AgentBuilder };
-use log::{ info, error, warn };
+use log::{ info, error, warn, debug };
 use serde::Deserialize;
 
 pub type CallBack = fn(progress: u32, time: u32, size: String);
@@ -86,11 +86,24 @@ pub fn get_classpath_separator() -> String {
 
 pub fn get_os_version() -> String {
     if let Ok(version) = os_version::detect() {
-        if consts::OS == "windows" || consts::OS == "linux" {
-            return version.to_string()
+        match version {
+            os_version::OsVersion::Windows(value) => {
+                format!("{}.",value.version).to_string()
+            } 
+            os_version::OsVersion::Linux(value) => {
+                if let Some(version) = value.version {
+                    version
+                } else {
+                    String::default()
+                }
+            }
+            _ => {
+                String::default()
+            }
         }
+    } else {
+        String::default()
     }
-    String::from("")
 }
 
 /// Returns the default path to the .minecraft directory
@@ -465,11 +478,11 @@ pub fn parse_single_rule(rule: &serde_json::Value, options: &mut GameOptions) ->
         for (key, value) in os.as_object().expect("Os was not object").iter() {
             match key.as_str() {
                 "name" => {
-                    if value == "windows" && consts::OS != "windows" {
+                    if value.as_str().expect("Should have been a string") == "windows" && consts::OS != "windows" {
                         return result;
-                    } else if value == "osx" && consts::OS != "macos" {
+                    } else if value.as_str().expect("Should have been a string") == "osx" && consts::OS != "macos" {
                         return result;
-                    } else if value == "linux" && consts::OS != "linux" {
+                    } else if value.as_str().expect("Should have been a string") == "linux" && consts::OS != "linux" {
                         return result;
                     }
                 }
@@ -479,7 +492,7 @@ pub fn parse_single_rule(rule: &serde_json::Value, options: &mut GameOptions) ->
                     }
                 }
                 "version" => {
-                    let r = regex::Regex::new(value.to_string().as_str()).expect("Failed to create regex");
+                    let r = regex::Regex::new(value.as_str().expect("Failed to make string")).expect("Failed to create regex");
                     if !r.is_match(get_os_version().as_str()) {
                         return result;
                     }
@@ -492,10 +505,10 @@ pub fn parse_single_rule(rule: &serde_json::Value, options: &mut GameOptions) ->
 
     if let Some(features) = rule.get("features") {
         for (key,_) in features.as_object().expect("Features was not a object").iter() {
-            if key == "has_custom_resolution" && options.custom_resolution.is_some() {
+            if key == "has_custom_resolution" && !options.custom_resolution.is_some() {
                 return result;
             }
-            if key == "is_demo_user" && options.demo.is_some() {
+            if key == "is_demo_user" && !options.demo {
                 return result;
             }
         }
@@ -776,7 +789,7 @@ fn test_download_file_compressed() {
 }
 #[test]
 fn test_get_os_verion(){
-    println!("{}",get_os_version());
+    println!("{:#?}",get_os_version());
 }
 
 #[test]
@@ -790,4 +803,10 @@ fn test_get_jar_mainclass() {
             eprintln!("{}",error);
         }
     }
+}
+
+#[test]
+fn test_regex() {
+    let r = regex::Regex::new("^10\\.").expect("Failed to create regex");
+    println!("{}",r.is_match("10."));
 }

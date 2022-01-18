@@ -1,5 +1,4 @@
 {
-  "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVEODRFNTE1ODFGMjczRjcKUldUM2MvS0JGZVdFWFlUWElwQlhDc3EvVitzS2tSMUZSMnhraWFDRjRCWjZMb09iREd6Y0tCWDQK",
   "package": {
     "productName": "mc-rust-launcher",
     "version": "0.1.0"
@@ -60,18 +59,41 @@
       }
     },
     "updater": {
-      "active": false
+      "dialog": true,
+      "active": false,
+      "endpoints": [
+        "https://raw.githubusercontent.com/VisualSource/mc-installer-v2/master/wellknowns/update.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVEODRFNTE1ODFGMjczRjcKUldUM2MvS0JGZVdFWFlUWElwQlhDc3EvVitzS2tSMUZSMnhraWFDRjRCWjZMb09iREd6Y0tCWDQK"
     },
     "allowlist": {
-      "fs": false,
-      "window": true,
-      "shell": false,
-      "dialog": true,
-      "http": true,
-      "notification": true,
-      "globalShortcut": true,
-      "path": false,
-      "os": true
+      "fs": {
+        "all": false
+      },
+      "window": {
+        "all": true
+      },
+      "shell": {
+        "all": false
+      },
+      "dialog": {
+        "all": true
+      },
+      "http": {
+        "all": true
+      },
+      "notification": {
+        "all": true
+      },
+      "globalShortcut": {
+        "all": true
+      },
+      "path": {
+        "all": false
+      },
+      "os": {
+        "all": true
+      }
     },
     "windows": [
       {

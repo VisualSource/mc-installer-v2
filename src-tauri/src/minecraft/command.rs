@@ -1,11 +1,10 @@
 use crate::minecraft::utils::{get_classpath_separator, parse_rule_list, JsonVersionsData, inherit_json};
 use crate::minecraft::exceptions::{WithException,InterialError, VersionNotFound};
 use crate::minecraft::runtime::{get_exectable_path};
-use crate::minecraft::install::to_real_string;
 use crate::minecraft::natives::get_natives;
 use std::fs::{read_to_string};
 use std::path::{ PathBuf };
-use log::{error};
+use log::{error, debug};
 
 #[derive(Default,Debug,Clone)]
 pub struct GameOptions {
@@ -14,7 +13,7 @@ pub struct GameOptions {
     pub executable_path: Option<PathBuf>,
     pub java_arguments: Option<String>,
     pub custom_resolution: Option<String>,
-    pub demo: Option<bool>,
+    pub demo: bool,
     pub launcher_name: Option<String>,
     pub launcher_version: Option<String>,
     pub username: Option<String>,
@@ -23,7 +22,7 @@ pub struct GameOptions {
     pub token: Option<String>,
     pub resolution_width: Option<String>,
     pub resolution_height: Option<String>,
-    pub enable_logging_config: Option<bool>,
+    pub enable_logging_config: bool,
     pub server: Option<String>,
     pub port: Option<String>
 }
@@ -32,19 +31,19 @@ pub struct GameOptions {
 pub fn get_libraries(data: &JsonVersionsData, path: PathBuf) -> WithException<String> {
    
     let class_sep = get_classpath_separator();
-    let mut libstr = String::new();
 
     if !data.libraries.is_array() {
         return Err(InterialError::boxed("Expected data to be json array"));
     }
 
+    let mut libstr = String::new();
     for i in data.libraries.as_array().expect("Lib should have been an array").iter() {
         if !parse_rule_list(i, "rules", &mut GameOptions::default()) {
             continue;
          }
         let mut current_path = path.join("libraries");
         // lib_path,name,version
-        let lib_name: Vec<String> = to_real_string(i.get("name").expect("Object sould have had name prop").clone()).split(":").map(|v|String::from(v)).collect();
+        let lib_name: Vec<String> = i.get("name").expect("Object sould have had name prop").as_str().expect("Failed to make str").clone().split(":").map(|v|String::from(v)).collect();
 
         let lib_path: Vec<String> = lib_name[0].split(".").map(|v|String::from(v)).collect();
 
@@ -58,14 +57,14 @@ pub fn get_libraries(data: &JsonVersionsData, path: PathBuf) -> WithException<St
         let native = get_natives(&i);
 
         let jar_name = if native.is_empty() {
-            format!("{}-{}.jar{}",lib_name[1],lib_name[2],class_sep).to_string()
+            format!("{}-{}.jar",lib_name[1],lib_name[2]).to_string()
         } else {
-            format!("{}-{}-{}.jar{}",lib_name[1],lib_name[2],native,class_sep).to_string()
+            format!("{}-{}-{}.jar",lib_name[1],lib_name[2],native).to_string()
         };
         
         current_path = current_path.join(jar_name);
 
-        libstr = vec![libstr,current_path.to_string_lossy().to_string()].join("");
+        libstr = vec![libstr,format!("{}{}",current_path.to_str().expect("Failed to make path a str"),class_sep).to_string()].join("");
     }
 
     let mut jarpath = path.clone();
@@ -164,18 +163,18 @@ pub fn get_arguments(data: &serde_json::Value, version_data: &JsonVersionsData, 
         }
 
         if i.is_string() {
-            if let Ok(value) = replace_arguments(i.to_string(), &version_data,&path,options) {
+            if let Ok(value) = replace_arguments(i.as_str().expect("Should be a str").to_string(), &version_data,&path,options) {
                 args.push(value);
             }
         } else {
             if let Some(value) = i.get("value") {
                 if value.is_string() {
-                    if let Ok(arg) = replace_arguments(value.to_string(), &version_data,&path,options) {
+                    if let Ok(arg) = replace_arguments(value.as_str().expect("Should be a string").to_string(), &version_data,&path,options) {
                         args.push(arg);
                     }
                 } else {
                     for v in value.as_array().expect("Should be a array") {
-                        if let Ok(arg) = replace_arguments(v.to_string(), &version_data,&path,options) {
+                        if let Ok(arg) = replace_arguments(v.as_str().expect("Failed to make string").to_string(), &version_data,&path,options) {
                             args.push(arg);
                         }
                     }
@@ -191,7 +190,7 @@ pub fn get_minecraft_commands(version: String, minecraft_dir: PathBuf, options: 
 
     let version_path = minecraft_dir.join("versions").join(version.clone());
 
-    if !version_path.exists() {
+    if !version_path.is_dir() {
         return Err(VersionNotFound::boxed(version));
     }
 
@@ -238,7 +237,7 @@ pub fn get_minecraft_commands(version: String, minecraft_dir: PathBuf, options: 
     if let Some(exec) = options.executable_path.clone() {
         command.push(String::from(exec.to_str().expect("Failed to make path a str")));
     } else if let Some(java) = data.javaVersion.clone() {
-        match get_exectable_path(java["component"].to_string(), minecraft_dir.clone()) {
+        match get_exectable_path(java["component"].as_str().expect("Failed to get runtime").to_string(), minecraft_dir.clone()) {
             Ok(exec) => {
                 if let Some(java) = exec {
                     command.push(String::from(java.to_str().expect("Failed to make path a str")));
@@ -268,23 +267,21 @@ pub fn get_minecraft_commands(version: String, minecraft_dir: PathBuf, options: 
         command.push(options.classpath.clone().expect("Expected classpath"));
     }
 
-    if let Some(logging) = options.enable_logging_config.clone() {
-        if logging  {
-            if let Some(logger) = data.logging.clone() {
-                let logger_id = logger["client"]["file"]["id"].to_string();
-                let logger_file = minecraft_dir.join("assets").join("log_configs").join(logger_id);
-                let cmd = logger["client"]["argument"].to_string().replace("${path}",logger_file.to_str().expect("Failed to transform"));
-                command.push(cmd);
-            }
+    if options.enable_logging_config  {
+        if let Some(logger) = data.logging.clone() {
+            let logger_id = logger["client"]["file"]["id"].as_str().expect("Failed to make string").to_string();
+            let logger_file = minecraft_dir.join("assets").join("log_configs").join(logger_id);
+            let cmd = logger["client"]["argument"].as_str().expect("Failed to make string").to_string().replace("${path}",logger_file.to_str().expect("Failed to transform"));
+            command.push(cmd);
         }
     }
-
+    
     command.push(data.mainClass.clone());
 
     // would do a minecraftArguments check in older game versions
 
     let args = get_arguments(&data.arguments["game"], &data, minecraft_dir, options);
-      
+   
     command = [command,args].concat();
 
     if let Some(server) = options.server.clone() {
@@ -296,15 +293,14 @@ pub fn get_minecraft_commands(version: String, minecraft_dir: PathBuf, options: 
         }
     }
 
-    let res: Vec<String> = command.iter().map(|v|v.replace("\"", "")).collect();
-
-    Ok(res)
+    debug!("{:#?}",command);
+    Ok(command)
 }
 
 
 #[test]
 fn test_get_minecraft_commands() {
-    let verion = "fabric-loader-0.12.12-1.17.1".to_string();
+    let verion = "1.17.1".to_string();
     let mc = PathBuf::from("C:\\Users\\Collin\\AppData\\Roaming\\.minecraft");
     let mut options = GameOptions::default();
     match get_minecraft_commands(verion, mc, &mut options) {

@@ -4,14 +4,13 @@ use std::boxed::Box;
 use std::fs::File;
 use std::env;
 
-
 pub const APP_INFO: AppInfo = AppInfo{ name: "MCRustLauncher", author: "VisualSource"};
 
 /// Setsup app_root and logger
 pub fn init() {
     app_root(AppDataType::UserConfig, &APP_INFO).expect("Failed to create app root");
 
-    let logs = app_dir(AppDataType::UserConfig, &APP_INFO, "/logs").expect("Failed to get logs path");
+    let logs = app_dir(AppDataType::UserConfig, &APP_INFO, "/logs").expect("Failed to get logs path").join("mc_rust_luncher.log");
 
     let is_debug = match env::var_os("LOGGER") {
         Some(value) => {
@@ -29,8 +28,8 @@ pub fn init() {
         ]
     } else {
         vec![
-            WriteLogger::new(LevelFilter::Warn, Config::default(), File::create(logs.join("mc_rust_lancher_warn.log")).expect("Failed to create log file")),
-            WriteLogger::new(LevelFilter::Error, Config::default(), File::create(logs.join("mc_rust_lancher_error.log")).expect("Failed to create log file"))
+            WriteLogger::new(LevelFilter::Warn, Config::default(), File::create(logs.clone()).expect("Failed to create log file")),
+            WriteLogger::new(LevelFilter::Error, Config::default(), File::create(logs).expect("Failed to create log file"))
         ]
     };
     CombinedLogger::init(prints).expect("Failed to create logginer");

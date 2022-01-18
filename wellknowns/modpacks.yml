@@ -1,12 +1,15 @@
-modpacks: 
-  - 
-    name: Fabric Basic
-    _uuid: cQjikdvQjQowUX0_mHOVR
-    img: https://placeholder.com/1920x1080
-    mc_version: "1.18.1"
-    mods: [
-      21TdQ5Mt1hFJ7nXlzbvk9
-    ]
-    desc_short: fabric mods pack
-    desc_long: this is a test fabric mod pack
-    loader: fabric
+cQjikdvQjQowUX0_mHOVR:
+  version: 1.0.0
+  mods: 
+    - 21TdQ5Mt1hFJ7nXlzbvk9
+  name: Fabric Basic;
+  mc: 1.18.1;
+  loader: fabric
+  media: 
+    icon: https://placeholder.com/40x40
+    list: https://placeholder.com/200x200
+    background: https://placeholder.com/1920x1080
+  links: 
+    - { name: string, path: string }
+  description: This is a test fabric mod pack
+  category: Fabric

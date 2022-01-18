@@ -1,4 +1,6 @@
-versions:
-  loaders: "1.0.0"
-  mods: "1.0.0"
-  modpacks: "1.0.0"
+mod_list: 
+  updated: Tue 12 2021 
+  version: 0.1.0
+modpacks:
+  updated: Tue 12 2021
+  version: 0.1.0

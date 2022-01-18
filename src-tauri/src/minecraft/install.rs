@@ -8,10 +8,6 @@ use std::path::PathBuf;
 use log::{ error, info };
 use serde::Deserialize;
 
-pub fn to_real_string(value: serde_json::Value) -> String {
-    value.as_str().expect("Should be a string").replace("\"","")
-}
-
 #[derive(Deserialize)]
 struct LatestMinecraft {
     release: String,
@@ -56,7 +52,7 @@ pub fn install_libraries(data: &JsonVersionsData, path: PathBuf) -> WithExceptio
         let mut download_url = String::from("https://libraries.minecraft.net");
 
         if let Some(url) = i.get("url") {
-            let mut new_url = to_real_string(url.clone());
+            let mut new_url = url.clone().as_str().expect("Failed to make string").to_string();
             if new_url.ends_with("/") {
                 new_url.pop();
                 download_url = new_url;
@@ -66,13 +62,16 @@ pub fn install_libraries(data: &JsonVersionsData, path: PathBuf) -> WithExceptio
         }
 
         // lib_path[0] == libPath, lib_path[1] == name, lib_path[2] == version
-        let lib_path: Vec<String> = to_real_string(i["name"].clone()).split(":").map(|v|String::from(v)).collect();
+        let libdata: Vec<String> = i["name"].clone().as_str().expect("Failed to make string").split(":").map(|v|String::from(v)).collect();
+        let libpath = libdata[0].clone();
+        let name = libdata[1].clone();
+        let mut version = libdata[2].clone();
 
-        if lib_path.len() != 3 {
+        if libdata.len() != 3 {
             continue;
         }
 
-        for lib_part in lib_path[0].split(".") {
+        for lib_part in libpath.split(".") {
             cur_path = cur_path.join(lib_part);
             download_url = format!("{}/{}",download_url,lib_part).to_string();
         }
@@ -80,22 +79,24 @@ pub fn install_libraries(data: &JsonVersionsData, path: PathBuf) -> WithExceptio
 
         let mut file_end = String::from("jar");
         // version_data[0] == version, version_data[1] == file_end
-        let version_data: Vec<&str> = lib_path[2].split("@").collect();
+        let version_data: Vec<&str> = version.split("@").collect();
 
         if version_data.len() == 2 {
             file_end = String::from(version_data[1]);
+            version = version_data[0].to_string();
         }
 
-        let jar_filename = format!("{}-{}.{}",lib_path[1],version_data[0],file_end).to_string();
-        download_url = format!("{}/{}/{}",download_url,lib_path[1],version_data[0]).to_string();
-        cur_path = cur_path.join(lib_path[1].clone()).join(version_data[0]);
+
+        let jar_filename = format!("{}-{}.{}",name,version,file_end).to_string();
+        download_url = format!("{}/{}/{}",download_url,name,version).to_string();
+        cur_path = cur_path.join(name.clone()).join(version.clone());
         
         let natives = get_natives(i);
 
 
         let mut jar_filename_native = String::new();
         if !natives.is_empty() {
-            jar_filename_native = format!("{}-{}-{}.jar",lib_path[1],version_data[0],natives).to_string();
+            jar_filename_native = format!("{}-{}-{}.jar",name,version,natives).to_string();
         }
 
         download_url = format!("{}/{}",download_url,jar_filename).to_string();
@@ -115,16 +116,16 @@ pub fn install_libraries(data: &JsonVersionsData, path: PathBuf) -> WithExceptio
         }
 
         if let Some(artifact) = i["downloads"].get("artifact") {
-            let url = to_real_string(artifact["url"].clone());
-            let sha1 = to_real_string(artifact["sha1"].clone());
+            let url = artifact["url"].clone().as_str().expect("Failed to make string").to_string();
+            let sha1 = artifact["sha1"].clone().as_str().expect("Failed to make string").to_string();
             if let Err(err) = download_file(url, cur_path.join(jar_filename), Some(sha1), false){
                 return Err(err);
             }
         }
 
         if !natives.is_empty() {
-            let url = to_real_string(i["downloads"]["classifiers"][natives.clone()]["url"].clone());
-            let sha1 = to_real_string(i["downloads"]["classifiers"][natives]["sha1"].clone());
+            let url = i["downloads"]["classifiers"][natives.clone()]["url"].clone().as_str().expect("Failed to make string").to_string();
+            let sha1 = i["downloads"]["classifiers"][natives]["sha1"].clone().as_str().expect("Failed to make string").to_string();
             if let Err(err) = download_file(url, cur_path.join(jar_filename_native.clone()), Some(sha1), false) {
                 return Err(err);
             }
@@ -147,9 +148,9 @@ pub fn install_assets(data: &JsonVersionsData, path: PathBuf) -> WithException<(
         None => return Ok(())
     };
 
-    let url = to_real_string(asset_index["url"].clone());
+    let url = asset_index["url"].clone().as_str().expect("Failed to make string").to_string();
     let asset_path = path.join("assets").join("indexes").join(format!("{}.json",data.assets.clone().expect("Expected prop assets to exists")));
-    let sha1 = to_real_string(asset_index["sha1"].clone());
+    let sha1 = asset_index["sha1"].clone().as_str().expect("Failed to make string").to_string();
 
     if let Err(err) = download_file(url, asset_path.clone(), Some(sha1), false) {
         return Err(err);
@@ -230,26 +231,32 @@ pub fn do_version_install(version_id: String, path: PathBuf, url: Option<String>
     }
 
     if let Some(logging) = manifest.logging.clone() {
-        let logger_file = path.join("assets").join("log_configs").join(to_real_string(logging["client"]["file"]["id"].clone()));
-        if let Err(err) = download_file(to_real_string(logging["client"]["file"]["url"].clone()), logger_file, Some(to_real_string(logging["client"]["file"]["sha1"].clone())), false) {
+        let logger_file = path.join("assets").join("log_configs").join(logging["client"]["file"]["id"].clone().as_str().expect("Failed to make string"));
+        if let Err(err) = download_file(
+            logging["client"]["file"]["url"].clone().as_str().expect("Failed to make string").to_string(), 
+            logger_file, 
+            Some(logging["client"]["file"]["sha1"].clone().as_str().expect("Failed to make string").to_string()), 
+            false) {
            return Err(err);
         }
     }
 
     if let Some(downloads) = manifest.downloads.clone() {
         let download_path = path.join("versions").join(manifest.id.clone()).join(format!("{}.jar",manifest.id.clone()).to_string());
-        if let Err(err) = download_file(to_real_string(downloads["client"]["url"].clone()), download_path, Some(to_real_string(downloads["client"]["sha1"].clone())), false) {
+        if let Err(err) = download_file(
+            downloads["client"]["url"].clone().as_str().expect("Failed to make string").to_string(), download_path, Some(downloads["client"]["sha1"].clone().as_str().expect("Failed to make string").to_string()), false) {
             return Err(err);
         }
     }
 
+    //Skipping support of old forge versions
 
     if let Some(args) = manifest.javaVersion.clone() {
-        let version = to_real_string(args["component"].clone());
+        let version = args["component"].clone().as_str().expect("Failed to make string").to_string();
         match does_runtime_exist(version,path.clone()) {
             Ok(value) => {
                 if !value {
-                    return install_jvm_runtime(to_real_string(args["component"].clone()),path);
+                    return install_jvm_runtime(args["component"].clone().as_str().expect("Failed to make string").to_string(),path);
                 }
             }
             Err(err) => return Err(err)
@@ -264,7 +271,7 @@ pub fn install_minecraft_version(version_id: String, minecraft_dir: PathBuf) -> 
 
     let version_json_path = minecraft_dir.join("versions").join(version_id.clone()).join(format!("{}.json",version_id.clone()).to_string());
 
-    if version_json_path.exists() {
+    if version_json_path.is_file() {
         return do_version_install(version_id, minecraft_dir, None);
     }
 

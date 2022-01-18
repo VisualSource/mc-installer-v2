@@ -1,5 +1,4 @@
 use crate::minecraft::exceptions::{WithException, InterialError};
-use crate::minecraft::install::to_real_string;
 use std::fs::{File, create_dir_all};
 use std::path::PathBuf;
 use std::env::consts;
@@ -18,21 +17,21 @@ pub fn get_natives(data: &serde_json::Value) -> String {
         match consts::OS {
             "windows" => {
                 if let Some(windows) = natives.get("windows") {
-                    to_real_string(windows.clone()).replace("$arch",arch)
+                    windows.clone().as_str().expect("Failed to make string").replace("$arch",arch)
                 } else {
                     String::new()
                 }
             }
             "macos" => {
                 if let Some(mac) = natives.get("osx") {
-                    to_real_string(mac.clone()).replace("${arch}",arch)
+                    mac.clone().as_str().expect("Failed to make string").replace("${arch}",arch)
                 } else {
                     String::new()
                 }
             }
             "linux" => {
                 if let Some(lin) = natives.get("linux") {
-                    to_real_string(lin.clone()).replace("${arch}",arch)
+                    lin.clone().as_str().expect("Failed to make string").replace("${arch}",arch)
                 } else {
                     String::new()
                 }
@@ -82,7 +81,7 @@ pub fn extract_natives_file(filename: PathBuf, extract_path: PathBuf, extract_da
     let mut ignores: Vec<String> = vec![];
 
     for file in extract_data["exclude"].as_array().expect("Sould be a string array").iter() {
-        ignores.push(to_real_string(file.clone()));
+        ignores.push(file.clone().as_str().expect("Failed to make string").to_string());
     }
 
     for i in 0..zip.len() {

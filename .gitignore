@@ -10,7 +10,7 @@
 
 # production
 /build
-/minecraft-launcher-lib
+/launcher_lib
 
 # misc
 .DS_Store

@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api';
 import { appWindow } from '@tauri-apps/api/window';
 import {Loader} from './db';
+import {nanoid} from "nanoid";
 
 export interface MinecraftNews {
     default_tile: {
@@ -89,7 +90,14 @@ export const get_minecraft_news = (documents: number = 20) => {
 export const run_install = () => {
     return invoke("run_install",{ manifest: {} });
 }
-export const run_minecraft = () => {
-    return invoke("run_minecraft",{ manifest: {} });
+
+export const run_minecraft = (options: any) => {
+    return invoke("run_minecraft",{ manifest: {
+        uuid: `${nanoid(8)}-${nanoid(4)}-${nanoid(4)}-${nanoid(4)}-${nanoid(12)}`,
+        token: "",
+        username: "Player 4",
+        mc: "1.17.1",
+        loader: "vanilla"
+    } });
 }
 
