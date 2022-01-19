@@ -1,11 +1,11 @@
-use crate::minecraft::utils::{download_file,parse_rule_list,inherit_json,get_user_agent, JsonVersionsData};
+use crate::minecraft::utils::{download_file,parse_rule_list,inherit_json, get_version_list,JsonVersionsData};
 use crate::minecraft::runtime::{install_jvm_runtime,does_runtime_exist};
 use crate::minecraft::exceptions::{WithException,InterialError,VersionNotFound};
 use crate::minecraft::natives::{get_natives,extract_natives_file};
 use crate::minecraft::command::GameOptions;
 use std::fs::read_to_string;
 use std::path::PathBuf;
-use log::{ error, info };
+use log::{ error, info, warn };
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -41,231 +41,268 @@ struct AssetMap {
     pub objects: std::collections::HashMap<String,AssetMapItem>
 }
 
-pub fn install_libraries(data: &JsonVersionsData, path: PathBuf) -> WithException<()> {
+pub type CallBack = fn(progress: usize, time: u32, item: usize, max_items: Option<usize>);
 
-    for i in data.libraries.as_array().expect("Should be a array").iter() {
+fn install_libraries(data: &JsonVersionsData, path: PathBuf, callback: CallBack ) -> WithException<()> {
+
+    let libraries = match data.libraries.as_array() {
+        Some(value) => value,
+        None => return Err(InterialError::boxed("object was not a array"))
+    };
+
+    let max_items = libraries.len(); 
+
+
+    callback(0,0,0,Some(max_items));
+
+    for (count,i) in libraries.iter().enumerate() {
         if !parse_rule_list(&i, "rules", &mut GameOptions::default()) {
             continue;
         }
+        let mut current_path = path.join("libraries");
 
-        let mut cur_path = path.join("libararies");
-        let mut download_url = String::from("https://libraries.minecraft.net");
-
+        let mut download_url = "https://libraries.minecraft.net".to_string();
         if let Some(url) = i.get("url") {
-            let mut new_url = url.clone().as_str().expect("Failed to make string").to_string();
-            if new_url.ends_with("/") {
-                new_url.pop();
-                download_url = new_url;
+            let value = url.as_str().expect("Failed to make string");
+            if value.ends_with("/") {
+                download_url = match value.get(0..(value.len() - 1)) {
+                    Some(uri) => uri.to_string(),
+                    None => return Err(InterialError::boxed("Failed to remove char /"))
+                } 
             } else {
-                download_url = new_url;
+                download_url = value.to_string();
             }
         }
 
-        // lib_path[0] == libPath, lib_path[1] == name, lib_path[2] == version
-        let libdata: Vec<String> = i["name"].clone().as_str().expect("Failed to make string").split(":").map(|v|String::from(v)).collect();
-        let libpath = libdata[0].clone();
-        let name = libdata[1].clone();
-        let mut version = libdata[2].clone();
+        let (libpath,name, mut version) = match i.get("name") {
+            Some(data) => {
+                match data.as_str() {
+                    Some(str_data) => {
+                        let lib_parts = str_data.split(":").map(|v|v.to_string()).collect::<Vec<String>>();
+                        if lib_parts.len() != 3 {
+                            warn!("Lib name does not contain the required params");
+                            continue;
+                        }
+                        (lib_parts[0].clone(),lib_parts[1].clone(),lib_parts[2].clone())
+                    }
+                    None => {
+                        warn!("Failed to make lib name a string");
+                        continue;
+                    }
+                }
+            }
+            None => {
+                warn!("Failed to get library name from string");
+                continue;
+            }
+        };
 
-        if libdata.len() != 3 {
-            continue;
+        for lib_path_part in libpath.split(".") {
+             current_path = current_path.join(lib_path_part);
+             download_url = format!("{}/{}",download_url,lib_path_part).to_string();
         }
 
-        for lib_part in libpath.split(".") {
-            cur_path = cur_path.join(lib_part);
-            download_url = format!("{}/{}",download_url,lib_part).to_string();
-        }
 
-
-        let mut file_end = String::from("jar");
-        // version_data[0] == version, version_data[1] == file_end
-        let version_data: Vec<&str> = version.split("@").collect();
-
+        let mut fileend = "jar";
+        let temp_version = version.clone();
+        let version_data = temp_version.split("@").clone().collect::<Vec<&str>>();
         if version_data.len() == 2 {
-            file_end = String::from(version_data[1]);
+            fileend = version_data[1];
             version = version_data[0].to_string();
         }
 
-
-        let jar_filename = format!("{}-{}.{}",name,version,file_end).to_string();
+        let jar_filename = format!("{}-{}.{}",name,version,fileend).to_string();
         download_url = format!("{}/{}/{}",download_url,name,version).to_string();
-        cur_path = cur_path.join(name.clone()).join(version.clone());
+        current_path = current_path.join(name.clone()).join(version.clone());
+
+        let native = get_natives(&i);
+        let jar_filename_native = if !native.is_empty() {
+            format!("{}-{}-{}.jar",name,version,native).to_string()
+        } else {
+            String::default()
+        };
         
-        let natives = get_natives(i);
-
-
-        let mut jar_filename_native = String::new();
-        if !natives.is_empty() {
-            jar_filename_native = format!("{}-{}-{}.jar",name,version,natives).to_string();
-        }
-
-        download_url = format!("{}/{}",download_url,jar_filename).to_string();
-
-
-        if let Err(err) = download_file(download_url, cur_path.clone().join(jar_filename.clone()), None, false) {
-           return Err(err);
+        if let Err(err) = download_file(download_url, current_path.join(jar_filename.clone()), None, false) {
+            error!("Failed to download file | {}", err);
         }
 
         if i.get("downloads").is_none() {
             if let Some(extract) = i.get("extract") {
-                if let Err(err) = extract_natives_file(cur_path.join(jar_filename_native),path.join("versions").join(data.id.clone()).join("natives"), extract){
-                    return Err(err);
+                if let Err(err) = extract_natives_file(current_path.join(jar_filename_native), path.join("version").join(data.id.clone()).join("natives"), &extract) {
+                    error!("Failed to extract natives file | {}",err);
                 }
             }
             continue;
         }
-
         if let Some(artifact) = i["downloads"].get("artifact") {
-            let url = artifact["url"].clone().as_str().expect("Failed to make string").to_string();
-            let sha1 = artifact["sha1"].clone().as_str().expect("Failed to make string").to_string();
-            if let Err(err) = download_file(url, cur_path.join(jar_filename), Some(sha1), false){
-                return Err(err);
+            let url = artifact["url"].as_str().expect("Failed to make string").to_string();
+            let sha1 = artifact["sha1"].as_str().expect("Failed to make string").to_string();
+            if let Err(err) = download_file(url, current_path.join(jar_filename), Some(sha1), false) {
+                error!("{}",err);
+                return Err(InterialError::boxed("Failed to download libarary artifact"));
             }
         }
-
-        if !natives.is_empty() {
-            let url = i["downloads"]["classifiers"][natives.clone()]["url"].clone().as_str().expect("Failed to make string").to_string();
-            let sha1 = i["downloads"]["classifiers"][natives]["sha1"].clone().as_str().expect("Failed to make string").to_string();
-            if let Err(err) = download_file(url, cur_path.join(jar_filename_native.clone()), Some(sha1), false) {
-                return Err(err);
-            }
-
-            if let Some(extract) = i.get("extract") {
-                if let Err(err) = extract_natives_file(cur_path.join(jar_filename_native), path.join("versions").join(data.id.clone()).join("natives"), extract) {
-                    return Err(err);
-                }
+        if !native.is_empty() {
+            let url = i["downloads"]["classifiers"][native.clone()]["url"].as_str().expect("Failed to make a string").to_string();
+            let sha1 = i["downloads"]["classifiers"][native]["sha1"].as_str().expect("Failed to make a string").to_string();
+            if let Err(err) = download_file(url, current_path.join(jar_filename_native), Some(sha1), false) {
+                error!("{}",err);
+                return Err(InterialError::boxed("Failed to download library native file"));
             }
         }
+        callback(count.clone(),0,count,None);
     }
+
+    info!("Download of libraries has finished");
     Ok(())
 }
 
-/// Install all assets
-pub fn install_assets(data: &JsonVersionsData, path: PathBuf) -> WithException<()> {
+fn install_assets(data: &JsonVersionsData, path: PathBuf, callback: CallBack) -> WithException<()> {
 
-    let asset_index = match data.assetIndex.clone() {
-        Some(value) => value,
-        None => return Ok(())
-    };
+    if let Some(asset_index) = data.assetIndex.clone() {
+        let url = asset_index["url"].as_str().expect("Failed to make string").to_string();
+        let sha1 = asset_index["sha1"].as_str().expect("Failed to make string").to_string();
+        let file_path = path.join("assets").join("indexes").join(format!("{}.json",data.assets.clone().expect("Failed to get assets key")));
 
-    let url = asset_index["url"].clone().as_str().expect("Failed to make string").to_string();
-    let asset_path = path.join("assets").join("indexes").join(format!("{}.json",data.assets.clone().expect("Expected prop assets to exists")));
-    let sha1 = asset_index["sha1"].clone().as_str().expect("Failed to make string").to_string();
+        if let Err(err) = download_file(url,file_path.clone(), Some(sha1), false) {
+            error!("{}",err);
+            return Err(InterialError::boxed("Failed to download asset file"));
+        }
 
-    if let Err(err) = download_file(url, asset_path.clone(), Some(sha1), false) {
-        return Err(err);
-    }
-
-    let manifest: AssetMap = match read_to_string(asset_path) {
-        Ok(value) => {
-            match serde_json::from_str::<AssetMap>(&value) {
-                Ok(json) => json,
-                Err(err) => {
-                    error!("{}",err);
-                    return Err(InterialError::boxed("Failed to transform data"))
+        let assets_data = match read_to_string(file_path) {
+            Ok(raw) => {
+                match serde_json::from_str::<AssetMap>(&raw) {
+                    Ok(value) => value,
+                    Err(err) => {
+                        error!("{}",err);
+                        return Err(InterialError::boxed("Failed to parse data into struct"));
+                    }
                 }
             }
-        }
-        Err(err) => {
-            error!("{}",err);
-            return Err(InterialError::boxed("Failed to read file"))
-        }
-    };
+            Err(err) => {
+                error!("{}",err);
+                return Err(InterialError::boxed("Failed to read file"));
+            }
+        };
 
-    for (key,value) in manifest.objects.iter() {
-        info!("GET {}",key);
-        let pre = value.hash.get(0..2).expect("Should have this value");
-        let url = format!("https://resources.download.minecraft.net/{}/{}",pre,value.hash.clone());
-        let path = path.join("assets").join("objects").join(pre).join(value.hash.clone());
-
-        if let Err(err) = download_file(url, path, Some(value.hash.clone()), false) {
-            return Err(err);
+        callback(0,0,0,Some(assets_data.objects.len()));
+        let mut count = 0;
+        for (key,value) in assets_data.objects.iter() {
+            info!("Fetch: {}",key);
+            let pre = value.hash.get(0..2).expect("Should have this value");
+            let url = format!("https://resources.download.minecraft.net/{}/{}",pre,value.hash.clone());
+            let outpath = path.join("assets").join("objects").join(pre).join(value.hash.clone());
+            if let Err(err) = download_file(url, outpath, Some(value.hash.clone()), false){
+                error!("{}",err);
+                return Err(InterialError::boxed("Failed to download object"));
+            }
+            count += 1;
+            callback(count,0,count,None);
         }
-        
+
+
     }
 
     Ok(())
 }
 
-pub fn do_version_install(version_id: String, path: PathBuf, url: Option<String>) -> WithException<()> {
-    
-    let version_path = path.join("versions").join(version_id.clone()).join(format!("{}.json",version_id.clone()).to_string());
-    if let Some(download) = url {
-        if let Err(err) = download_file(download, version_path.clone(), None, false) {
-            return Err(err);
+fn do_version_install(version_id: String, path: PathBuf, url: Option<String>, callback: CallBack) -> WithException<()> {
+
+    let version_json = path.join("versions").join(version_id.clone()).join(format!("{}.json",version_id));
+
+    if let Some(do_url) = url {
+        if let Err(err) = download_file(do_url,version_json.clone(), None, false) {
+            error!("{}",err);
+            return Err(InterialError::boxed("Failed to download verion json"));
         }
     }
 
-    let mut manifest: JsonVersionsData = match read_to_string(version_path) {
-        Err(err) => {
-            error!("{}",err);
-            return Err(InterialError::boxed("Failed to read manifest"))
-        },
+    let mut version_data: JsonVersionsData = match read_to_string(version_json) {
         Ok(raw) => {
             match serde_json::from_str::<JsonVersionsData>(&raw) {
                 Ok(value) => value,
                 Err(err) => {
                     error!("{}",err);
-                    return Err(InterialError::boxed("Failed to translate manifest"));
+                    return Err(InterialError::boxed("Failed to parse data into struct"));
                 }
             }
         }
+        Err(err) => {
+            error!("{}",err);
+            return Err(InterialError::boxed("Failed read file"));
+        }
     };
 
-    if manifest.inheritsFrom.is_some() {
-        match inherit_json(&manifest, &path) {
-            Ok(value) => {
-                manifest = value;
+
+    if version_data.inheritsFrom.is_some() {
+        match inherit_json(&version_data, &path) {
+            Ok(data) => {
+                version_data = data;
             }
-            Err(err) => {
+            Err(err) => return Err(err)
+        }
+    }
+
+    if let Err(err) = install_libraries(&version_data, path.clone(), callback) {
+        return Err(err);
+    }
+    if let Err(err) = install_assets(&version_data, path.clone(), callback) {
+        return Err(err);
+    }
+
+    if let Some(logging) = version_data.logging {
+        if logging.as_object().expect("Failed to make logging a object").len() != 0 {
+            let logging_file = path.join("assets").join("log_configs").join(logging["client"]["file"]["id"].as_str().expect("Failed to make string"));
+            let url = logging["client"]["file"]["url"].as_str().expect("Failed to make string").to_string();
+            let sha1 = logging["client"]["file"]["sha1"].as_str().expect("Failed to make string").to_string();
+            if let Err(err) = download_file(url, logging_file, Some(sha1), false) {
                 return Err(err);
-            } 
+            }
         }
     }
 
-    if let Err(err) = install_libraries(&manifest,path.clone()) {
-        return Err(err);
-    }
-    if let Err(err) = install_assets(&manifest,path.clone()) {
-        return Err(err);
-    }
-
-    if let Some(logging) = manifest.logging.clone() {
-        let logger_file = path.join("assets").join("log_configs").join(logging["client"]["file"]["id"].clone().as_str().expect("Failed to make string"));
-        if let Err(err) = download_file(
-            logging["client"]["file"]["url"].clone().as_str().expect("Failed to make string").to_string(), 
-            logger_file, 
-            Some(logging["client"]["file"]["sha1"].clone().as_str().expect("Failed to make string").to_string()), 
-            false) {
-           return Err(err);
-        }
-    }
-
-    if let Some(downloads) = manifest.downloads.clone() {
-        let download_path = path.join("versions").join(manifest.id.clone()).join(format!("{}.jar",manifest.id.clone()).to_string());
-        if let Err(err) = download_file(
-            downloads["client"]["url"].clone().as_str().expect("Failed to make string").to_string(), download_path, Some(downloads["client"]["sha1"].clone().as_str().expect("Failed to make string").to_string()), false) {
+    if let Some(downloads) = version_data.downloads {
+        let url = downloads["client"]["url"].as_str().expect("Failed to make string").to_string();
+        let sha1 = downloads["client"]["sha1"].as_str().expect("Failed to make string").to_string();
+        let output = path.join("versions").join(version_data.id.clone()).join(format!("{}.jar",version_data.id.clone()));
+        if let Err(err) = download_file(url, output, Some(sha1), false) {
             return Err(err);
         }
     }
 
-    //Skipping support of old forge versions
-
-    if let Some(args) = manifest.javaVersion.clone() {
-        let version = args["component"].clone().as_str().expect("Failed to make string").to_string();
-        match does_runtime_exist(version,path.clone()) {
-            Ok(value) => {
-                if !value {
-                    return install_jvm_runtime(args["component"].clone().as_str().expect("Failed to make string").to_string(),path);
-                }
-            }
-            Err(err) => return Err(err)
+    if let Some(java_version) = version_data.javaVersion {
+        info!("Start JVM check");
+        if let Err(err) = install_jvm_runtime(java_version["component"].as_str().expect("Failed to make string").to_string(), path) {
+            return Err(err);
         }
     }
 
     Ok(())
 }
 
+pub fn install_minecraft_version(version_id: String, minecraft_dir: PathBuf) -> WithException<()> {
+    
+    if minecraft_dir.join("versions").join(version_id.clone()).join(format!("{}.json",version_id.clone())).is_file() {
+        if let Err(err) = do_version_install(version_id, minecraft_dir,None, |progress, time, item, max_items| { info!("Progess {} | time: {} | item: {} | max: {:?}",progress,time,item,max_items); }  ) {
+            return Err(err);
+        }
+        return Ok(());
+    }
+
+    match get_version_list() {
+        Ok(versions) => {
+            for i in versions.iter() {
+                if i.id == version_id {
+                    return do_version_install(version_id, minecraft_dir, Some(i.url.clone()), |progress, time, item, max_items| { info!("Progess {} | time: {} | item: {} | max: {:?}",progress,time,item,max_items); })
+                }
+            }
+            Err(VersionNotFound::boxed(version_id))
+        }
+        Err(err) => Err(err)
+    }
+}
+
+/*
 /// Installs a minecraft version
 pub fn install_minecraft_version(version_id: String, minecraft_dir: PathBuf) -> WithException<()> {
 
@@ -300,75 +337,4 @@ pub fn install_minecraft_version(version_id: String, minecraft_dir: PathBuf) -> 
             Err(InterialError::boxed("Failed to get version list"))
         }
     }
-}
-
-
-#[test]
-fn test_install_minecraft_verions() {
-    let mc = PathBuf::from("C:\\Users\\Collin\\AppData\\Roaming\\.minecraft");
-    let version = String::from("1.17.1");
-
-    match install_minecraft_version(version, mc) {
-        Ok(_) => {}
-        Err(err) => {
-            eprintln!("{}",err);
-        } 
-    }
-}
-
-#[test]
-fn test_do_version_install() {
-    unimplemented!();
-}
-
-
-#[test]
-fn test_install_assets() {
-    let mc = PathBuf::from("C:\\Users\\Collin\\AppData\\Roaming\\.minecraft");
-    let dummy = JsonVersionsData {
-        inheritsFrom: None,
-        arguments: json!({}),
-        assetIndex: Some(json!({
-            "id": "1.17",
-            "sha1": "1898734d8df0347c8b297eff354a4e1738d28c21",
-            "size": 346003,
-            "totalSize": 346400827,
-            "url": "https://launchermeta.mojang.com/v1/packages/1898734d8df0347c8b297eff354a4e1738d28c21/1.17.json"
-        })),
-        assets: Some(String::from("1.17")),
-        complianceLevel: None,
-        downloads: None,
-        id: String::new(),
-        javaVersion: None,
-        libraries: json!({}),
-        logging: None,
-        mainClass: String::new(),
-        minimumLauncherVersion: None,
-        releaseTime: String::new(),
-        time: String::new(),
-        jar: None,
-        r#type: String::new()
-    };
-
-    match install_assets(&dummy, mc) {
-        Ok(_) => {}
-        Err(err) => {
-            eprintln!("{}",err);
-        }
-    }
-}
-
-#[test]
-fn test_install_libraries() {
-    let mc = PathBuf::from("C:\\Users\\Collin\\AppData\\Roaming\\.minecraft");
-    let manifest = PathBuf::from("C:\\Users\\Collin\\AppData\\Roaming\\.minecraft\\versions\\1.17.1\\1.17.1.json");
-
-    let a = serde_json::from_str::<JsonVersionsData>(&read_to_string(manifest).expect("Failed")).expect("");
-
-    match install_libraries(&a, mc) {
-        Ok(_) => {}
-        Err(value) => {
-            eprintln!("{}",value);
-        }
-    }
-}
+}*/

@@ -87,8 +87,12 @@ export const get_minecraft_news = (documents: number = 20) => {
     return invoke<MinecraftNews[]>("get_minecraft_news",{ documents: documents.toString() });
 }
 
-export const run_install = () => {
-    return invoke("run_install",{ manifest: {} });
+export const run_install = (): Promise<void> => {
+    return invoke<void>("run_install",{ manifest: {
+        loader: "vanilla",
+        version: "1.17.1",
+        mods: [],
+    } });
 }
 
 export const run_minecraft = (options: any) => {
@@ -96,7 +100,7 @@ export const run_minecraft = (options: any) => {
         uuid: `${nanoid(8)}-${nanoid(4)}-${nanoid(4)}-${nanoid(4)}-${nanoid(12)}`,
         token: "",
         username: "Player 4",
-        mc: "1.17.1",
+        version: "1.17.1",
         loader: "vanilla"
     } });
 }
