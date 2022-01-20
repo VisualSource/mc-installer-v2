@@ -588,7 +588,6 @@ pub fn inherit_json(original_data: &JsonVersionsData, path: &PathBuf) -> WithExc
         libs.push(lib.to_owned());
     }
 
-
     let arguments_game = new_data.arguments.get_mut("game").expect("There should be game").as_array_mut().expect("Should be array");
 
     for arg in inherit_data.arguments.get("game").expect("args").as_array().expect("array") {

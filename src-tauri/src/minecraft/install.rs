@@ -272,8 +272,16 @@ fn do_version_install(version_id: String, path: PathBuf, url: Option<String>, ca
 
     if let Some(java_version) = version_data.javaVersion {
         info!("Start JVM check");
-        if let Err(err) = install_jvm_runtime(java_version["component"].as_str().expect("Failed to make string").to_string(), path) {
-            return Err(err);
+        let runtime = java_version["component"].as_str().expect("Failed to make string").to_string();
+        match does_runtime_exist(runtime.clone(), path.clone()) {
+            Ok(has_runtime) => {
+                if !has_runtime {
+                    if let Err(err) = install_jvm_runtime(runtime, path) {
+                        return Err(err);
+                    }
+                }
+            }
+            Err(err) => return Err(err)
         }
     }
 
@@ -301,40 +309,3 @@ pub fn install_minecraft_version(version_id: String, minecraft_dir: PathBuf) -> 
         Err(err) => Err(err)
     }
 }
-
-/*
-/// Installs a minecraft version
-pub fn install_minecraft_version(version_id: String, minecraft_dir: PathBuf) -> WithException<()> {
-
-    let version_json_path = minecraft_dir.join("versions").join(version_id.clone()).join(format!("{}.json",version_id.clone()).to_string());
-
-    if version_json_path.is_file() {
-        return do_version_install(version_id, minecraft_dir, None);
-    }
-
-    let agent = get_user_agent();
-
-    match agent.get("https://launchermeta.mojang.com/mc/game/version_manifest.json").call() {
-        Ok(value) => {
-            match value.into_json::<VersionManifest>() {
-                Ok(json) => {
-                    for version in json.versions {
-                        if version.id == version_id {
-                            return do_version_install(version_id, minecraft_dir, Some(version.url));
-                        }
-                    }
-
-                    Err(VersionNotFound::boxed(version_id))
-                }
-                Err(err) => {
-                    error!("{}",err);
-                    Err(InterialError::boxed("Failed to transform data"))
-                }
-            }
-        }
-        Err(err) => {
-            error!("{}",err);
-            Err(InterialError::boxed("Failed to get version list"))
-        }
-    }
-}*/

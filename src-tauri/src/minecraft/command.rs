@@ -24,7 +24,9 @@ pub struct GameOptions {
     pub resolution_height: Option<String>,
     pub enable_logging_config: bool,
     pub server: Option<String>,
-    pub port: Option<String>
+    pub port: Option<String>,
+    pub xuid: Option<String>,
+    pub client_id: Option<String>
 }
 
 /// Returns the argument with all libs that come after -cp
@@ -141,6 +143,13 @@ pub fn replace_arguments(arg: String, version_data: &JsonVersionsData, path: &Pa
     if let Some(prama) = options.token.clone().or(Some("{token}".to_string())) {
         argstr = argstr.replace("${auth_session}", prama.as_str())
     } 
+
+    if let Some(xuid) = options.xuid.clone().or(Some("{auth_xuid}".to_string())) {
+        argstr = argstr.replace("${auth_xuid}", &xuid);
+    }
+    if let Some(client_id) = options.client_id.clone().or(Some("{clientId}".to_string())) {
+        argstr = argstr.replace("${clientid}", &client_id);
+    }
 
     argstr = argstr.replace("${library_directory}",path.join("libraries").to_str().expect("Should have been a string"));
 

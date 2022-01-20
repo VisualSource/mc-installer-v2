@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api';
 import { appWindow } from '@tauri-apps/api/window';
-import {Loader} from './db';
+import DB, {Loader, UUID} from './db';
 import {nanoid} from "nanoid";
 
 export interface MinecraftNews {
@@ -32,6 +32,9 @@ export interface MinecraftNews {
     } | null
 }
 
+export const logout_microsoft = (): Promise<any> => {
+    return invoke<void>("logout_microsoft_account");
+}
 export const login_microsoft = (): Promise<any> => {
     return new Promise((ok,err)=>{
         appWindow.once('mcrust://login_micosoft', ({ event, payload }) => {
@@ -89,19 +92,35 @@ export const get_minecraft_news = (documents: number = 20) => {
 
 export const run_install = (): Promise<void> => {
     return invoke<void>("run_install",{ manifest: {
-        loader: "vanilla",
-        version: "1.17.1",
+        loader: "fabric",
+        version: "1.18.1",
         mods: [],
+        uuid: nanoid()
     } });
 }
 
-export const run_minecraft = (options: any) => {
-    return invoke("run_minecraft",{ manifest: {
+export const run_minecraft = async (options: { profile: UUID }) => {
+    let db = new DB();
+    let profile = await db.getProfile(options.profile);
+
+    if (!profile) {
+        throw new Error("Failed to get profile");
+    }
+
+    console.log(profile);
+
+    let manifest = {
+        version: profile.mc,
+        loader: profile.loader
+    }
+
+
+   /* return invoke("run_minecraft",{ manifest: {
         uuid: `${nanoid(8)}-${nanoid(4)}-${nanoid(4)}-${nanoid(4)}-${nanoid(12)}`,
         token: "",
         username: "Player 4",
-        version: "1.17.1",
-        loader: "vanilla"
-    } });
+        version: "fabric-loader-0.12.12-1.18.1",
+        loader: "fabric"
+    } });*/
 }
 

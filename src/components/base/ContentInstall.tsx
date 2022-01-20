@@ -161,7 +161,8 @@ function Actions({type, content}: { content: any, type: "mod" | "modpack" | "pro
         case "profile":
             return (
                 <>
-                    <Button size="small" startIcon={<PlayArrowIcon/>} color={gameRunning ? "warning" : "primary"} variant="contained" onClick={()=>{setStartupDialog(true); run_minecraft({}); }} disabled={gameRunning}>{ gameRunning ? "PLAYING" : "PLAY" }</Button>
+                    <Button size="small" startIcon={<PlayArrowIcon/>} color={gameRunning ? "warning" : "primary"} variant="contained" onClick={()=>{setStartupDialog(true); run_minecraft({ profile: content.uuid }); }} disabled={gameRunning}>{ gameRunning ? "PLAYING" : "PLAY" }</Button>
+                    <Button size="small" startIcon={<PlayArrowIcon/>} variant="contained" onClick={()=>{setStartupDialog(true); run_install() }}>INSTALL</Button>
                     <Button size="small" variant="contained" startIcon={<EditIcon/>} onClick={()=>setEditProfile({show: true, profile: content.uuid})}>EDIT</Button>
                     <div id="profile-played">
                         <Typography sx={{ fontSize: 15 }} variant="subtitle1">LAST PLAYED</Typography>

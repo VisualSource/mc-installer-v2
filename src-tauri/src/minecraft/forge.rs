@@ -58,7 +58,7 @@ pub fn install_forge_version(version: String, path: PathBuf, java: Option<String
     let exec = match java {
         Some(value) => value,
         None => {
-            match get_exectable_path("java-runtime-alpha".to_string(), path.clone()) {
+            match get_exectable_path("java-runtime-beta".to_string(), path.clone()) {
                 Ok(value) => {
                     match value {
                         Some(j) => String::from(j.to_str().expect("Failed to make path a string")),
@@ -108,7 +108,13 @@ pub fn install_forge_version(version: String, path: PathBuf, java: Option<String
             return Err(ExternalProgramError::boxed("failed to execute process","", "", ""));
         }
     }
-    Ok(())
+
+
+
+    let version_id = version.split("-").collect::<Vec<&str>>();
+    let id = format!("{}-forge-{}",version_id[0],version_id[1]).to_string();
+    info!("Start install of {}",id);
+    install_minecraft_version(id, path)
 }
 
 /// returns a list of forge versions

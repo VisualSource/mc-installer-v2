@@ -54,5 +54,10 @@ export interface MSAccounts {
 
 export const ms_accounts = atom<MSAccounts[]>({
     key: "MS_ACCOUNTS",
-    default: []
+    default: [{
+        active: true,
+        uuid: "",
+        email: "boomishere_network@outlook.com",
+        username: "Visualsource"
+    }]
 }); 

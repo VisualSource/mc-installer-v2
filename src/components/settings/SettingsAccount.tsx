@@ -1,5 +1,5 @@
 import { Container, Typography, Button, Box, List, ListItem, ListItemText, Chip, MenuItem } from "@mui/material";
-import { login_microsoft } from '../../core/cmds';
+import { login_microsoft, logout_microsoft } from '../../core/cmds';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import { ListIconButton } from "../ListButton";
 import { useState } from "react";
@@ -10,7 +10,7 @@ function AccountOptions({ uuid, active, mc }: { mc: boolean, uuid: string, activ
     return (
         <ListIconButton btnProps={{ size: "small", sx: { borderRadius: 0, border: "solid 1px gray" } }} icon={<MoreHorizIcon/>}>
             {({handleClose}: any)=>[ 
-                <MenuItem onClick={handleClose} key={0}>Remove Account</MenuItem>,
+                <MenuItem onClick={()=>{logout_microsoft(); handleClose();}} key={0}>Remove Account</MenuItem>,
                 <MenuItem onClick={handleClose} key={1}>Manage account</MenuItem>,
                 mc && !active ? <MenuItem onClick={handleClose} key={2}>Set as active</MenuItem> : null
             ]}

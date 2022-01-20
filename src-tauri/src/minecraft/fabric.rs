@@ -9,7 +9,8 @@ use std::path::PathBuf;
 use std::fs::remove_file;
 use serde::{Deserialize,Serialize};
 use app_dirs2::{app_dir, AppDataType};
-use log::{error,info};
+use log::{error,info };
+use simplelog::{TermLogger, LevelFilter, Config, TerminalMode, ColorChoice };
 
 const FABRIC_API_ROOT: &str = "https://meta.fabricmc.net/v2/versions/";
 const FABRIC_INSTALLER_MAVEN: &str = "https://maven.fabricmc.net/net/fabricmc/fabric-installer/";
@@ -172,7 +173,7 @@ pub fn install_fabric(mc_version: String, mc_dir: PathBuf, loader_verion: Option
             return Err(err);
         }
     }
-    
+
     match is_minecraft_version_supported(mc_version.clone()) {
         Ok(value) => {
             if !value {
@@ -194,10 +195,12 @@ pub fn install_fabric(mc_version: String, mc_dir: PathBuf, loader_verion: Option
         }
     };
 
-    if let Err(err) = install_minecraft_version(mc_version.clone(), mc_dir.clone()) {
-        return Err(err);
+    if !mc_dir.join("versions").join(mc_version.clone()).join(format!("{}.json",mc_version)).is_file() || !mc_dir.join("versions").join(mc_version.clone()).join(format!("{}.jar",mc_version)).is_file(){
+        if let Err(err) = install_minecraft_version(mc_version.clone(), mc_dir.clone()) {
+            return Err(err);
+        }
     }
-
+    
     let installer_version = match get_latest_installer_verion() {
         Ok(value) => value,
         Err(err) => return Err(err)
@@ -222,7 +225,7 @@ pub fn install_fabric(mc_version: String, mc_dir: PathBuf, loader_verion: Option
     let exec = match java {
         Some(value) => value,
         None => {
-            match get_exectable_path("java-runtime-alpha".to_string(), mc_dir.clone()) {
+            match get_exectable_path("java-runtime-beta".to_string(), mc_dir.clone()) {
                 Ok(value) => {
                     match value {
                         Some(j) => String::from(j.to_str().expect("Failed to make path a string")),
@@ -243,8 +246,7 @@ pub fn install_fabric(mc_version: String, mc_dir: PathBuf, loader_verion: Option
         "-mcversion",
         mc_version.as_str(),
         "-loader",
-        loader.as_str(),
-        "-snapshot"
+        loader.as_str()
     ];
 
     match Command::new(exec).args(args).stdout(Stdio::inherit()).output() {
@@ -269,14 +271,17 @@ pub fn install_fabric(mc_version: String, mc_dir: PathBuf, loader_verion: Option
 
 
     let fabric_mc = format!("fabric-loader-{}-{}",loader,mc_version).to_string();
+    info!("Start {} install",fabric_mc);
     install_minecraft_version(fabric_mc, mc_dir)
 }
 
 
 #[test]
 fn test_install_fabric() {
+    TermLogger::init(LevelFilter::Info,Config::default(), TerminalMode::Stdout, ColorChoice::Always).expect("Failed to make logger");
+    //TermLogger::init(LevelFilter::Info,Config::default(), TerminalMode::Stdout, ColorChoice::Always).expect("Failed to make logger");
     let mc = PathBuf::from("C:\\Users\\Collin\\AppData\\Roaming\\.minecraft");
-    if let Err(err) = install_fabric(String::from("1.17.1"),mc,None,None) {
+    if let Err(err) = install_fabric(String::from("1.18.1"),mc,None,None) {
         eprintln!("{}",err);
     }
 }

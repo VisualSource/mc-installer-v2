@@ -4,7 +4,7 @@ use log::{ error, info };
 use serde::Deserialize;
 use std::path::PathBuf;
 
-pub fn install_iris(mc_dir: PathBuf, mc_version: String) -> WithException<()> {
+pub fn install_iris(mc_dir: PathBuf, mc_version: String, installer_version: Option<String>) -> WithException<()> {
     unimplemented!();
 }
 

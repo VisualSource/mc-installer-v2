@@ -15,5 +15,6 @@ pub mod fabric;
 pub mod forge;
 pub mod iris;
 pub mod optifine;
+pub mod mods;
 
 

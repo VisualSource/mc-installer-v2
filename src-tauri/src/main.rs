@@ -36,7 +36,9 @@ use commands::{
    login::{
      login_microsoft_account,
      ms_login_done,
-     refresh_microsoft_account
+     refresh_microsoft_account,
+     logout_microsoft_account,
+     ms_logout_done
    } };
 
 fn main() {
@@ -45,11 +47,13 @@ fn main() {
   tauri::Builder::default()
       .invoke_handler(tauri::generate_handler![
         login_microsoft_account,
+        logout_microsoft_account,
         get_vanilla_versions,
         get_fabric_verions,
         get_forge_versions,
         get_latest_minecraft_version,
         ms_login_done,
+        ms_logout_done,
         get_minecraft_news,
         refresh_microsoft_account,
         run_minecraft,
