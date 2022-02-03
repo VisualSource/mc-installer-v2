@@ -1,9 +1,16 @@
-use crate::minecraft::exceptions::{ WithException, InterialError };
+extern crate jsonwebtoken;
+use crate::minecraft::exceptions::{ WithException, InterialError ,ExternalProgramError };
 use crate::minecraft::utils::get_user_agent;
 use serde::{Deserialize, Serialize};
-use log::{ error, debug };
+use crate::app::APP_INFO;
+use app_dirs2::{app_dir, AppDataType};
+use std::fs::{File,write};
+use log::{ error, debug, warn };
+use tauri::api::http::{Body, ResponseType, HttpRequestBuilder, ClientBuilder};
+use std::collections::HashMap;
 
 const MS_TOKEN_AUTHORIZATION_URL: &str = "https://login.live.com/oauth20_token.srf";
+
 
 #[derive(Deserialize, Debug)]
 struct OAuth2LoginJson {
@@ -38,24 +45,74 @@ struct XboxLiveClaims {
     not_after: String
  }
 
-#[derive(Deserialize, Debug)]
-struct XSTSJson {
-    #[serde(rename="Token")]
-    token: String,
-}
+ #[derive(Deserialize, Debug)]
+struct XboxLiveError {
+    #[serde(rename="Identity")]
+    identify: String,
+    #[serde(rename="XErr")]
+    xerr: u32,
+    #[serde(rename="Message")]
+    message: String,
+    #[serde(rename="Redirect")]
+    redirect: String
+} 
 
 #[derive(Deserialize, Debug)]
 struct MinecraftJson {
-    access_token: String
+    access_token: String,
+    username: String,
+    token_type: String,
+    expires_in: u32,
+    roles: Vec<String>
+}
+
+#[derive(Deserialize,Serialize, Clone, Debug)]
+pub struct PlayerCapes {
+    id: String,
+    state: String,
+    url: String,
+    alias: Option<String>,
+    varient: Option<String>,
+}
+
+#[derive(Deserialize,Serialize, Clone, Debug)]
+pub struct PlayerSkins {
+    id: String,
+    state: String,
+    url: String,
+    varient: Option<String>,
+    alias: Option<String>,
 }
 
 #[derive(Deserialize,Serialize, Clone, Debug)]
 pub struct PlayerProfile {
     pub id: String,
     pub name: String,
-    pub access_token: Option<String>,
-    pub refresh_token: Option<String>
+    pub skins: Vec<PlayerSkins>,
+    pub capes: Vec<PlayerCapes>
 }
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct Account {
+    profile: PlayerProfile,
+    access_token: String,
+    refresh_token: String
+}
+
+#[derive(Deserialize, Debug)]
+struct GameOwnerShipItem {
+    name: String,
+    signature: String
+}
+
+#[derive(Deserialize, Debug)]
+struct GameOwnership {
+    items: Vec<GameOwnerShipItem>,
+    signature: String,
+    #[serde(rename="keyId")]
+    key_id: String
+}
+
 ///https://login.live.com/logout.srf?
 /// ct=1642644026&rver=7.0.6738.0&
 /// lc=1033&id=292666&
@@ -85,7 +142,7 @@ pub fn url_contains_auth_code(url: String) -> bool {
     }
 }
 
-pub fn get_auth_code_from_url(url: String) -> WithException<String> {
+pub fn get_auth_code_from_url(url: String) -> Result<String,String> {
 
     let parsed = urlparse::urlparse(url);
 
@@ -93,7 +150,7 @@ pub fn get_auth_code_from_url(url: String) -> WithException<String> {
         Some(value) => value,
         None => {
             error!("Url does not contain a query string");
-            return Err(InterialError::boxed("Url does not contain a query string"))
+            return Err("Url does not contain a query string".to_string())
         }
     };
 
@@ -101,7 +158,7 @@ pub fn get_auth_code_from_url(url: String) -> WithException<String> {
         Some(value) => value,
         None => {
             error!("Url does not contain a query prop 'code'");
-            return Err(InterialError::boxed("Url does not contain a query prop 'code'"))
+            return Err("Url does not contain a query prop 'code'".to_string())
         }
     };
 
@@ -109,7 +166,7 @@ pub fn get_auth_code_from_url(url: String) -> WithException<String> {
         Some(value) => value,
         None => {
             error!("Failed to get auth code");
-            return Err(InterialError::boxed("Failed to get auth code"))
+            return Err("Failed to get auth code".to_string())
         }
     };
 
@@ -183,9 +240,13 @@ fn refresh_authorization_token(client_id: String, client_secret: String, redirec
     }
 }
 
-
-fn authenticate_with_xbl(access_token: String) -> WithException<u8> {
-    let agent: ureq::Agent = get_user_agent();
+/// currently due a bug with ureq and the underlining TLS library
+/// will have to use the async tauri::api::http lib 
+/// though i would rather use ureq lib as its sync rather then async 
+/// because when calling this func it will be inside a async func already
+/// <https://github.com/algesten/ureq/issues/317>
+async fn authenticate_with_xbl(access_token: String) -> WithException<XboxLiveJson> {
+    let client = ClientBuilder::new().build().expect("Failed to make http client");
 
     let payload = json!({
         "Properties": {
@@ -198,26 +259,44 @@ fn authenticate_with_xbl(access_token: String) -> WithException<u8> {
     
      });
 
-    match agent.post("https://user.auth.xboxlive.com/user/authenticate").set("Accept", "application/json").send_json(payload) {
+    let mut headers: HashMap<String,String> = HashMap::new();
+    headers.insert("Accept".to_string(), "application/json".to_string());
+    headers.insert("Content-Type".to_string(),"application/json".to_string());
+    headers.insert("User-Agent".to_string(),"rusty-minecraft-launcher/1.0.0".to_string());
+
+    let request_builder = HttpRequestBuilder::new("POST", "https://user.auth.xboxlive.com/user/authenticate");
+    let request = request_builder.body(Body::Json(payload)).response_type(ResponseType::Json).headers(headers);
+
+    match client.send(request).await {
         Ok(value) => {
-            debug!("{:?}",value.into_string());
+            match value.read().await {
+                Ok(response) => {
+                    match serde_json::from_value::<XboxLiveJson>(response.data) {
+                        Ok(result) => {
+                            Ok(result)
+                        }
+                        Err(err) => {
+                            error!("{}",err);
+                            Err(InterialError::boxed("Failed to convert to struct"))
+                        }
+                    }
+                }
+                Err(err) => {
+                    error!("{}",err);
+                    Err(InterialError::boxed("Failed to read response"))
+                }
+            }
         }
-        Err(ureq::Error::Status(code, response)) => {
-            error!("Status: {} | {:?}",code,response.into_string());
-            //Err(InterialError::boxed("Failed to make request"));
-        }
-        Err(ureq::Error::Transport(err)) => {
-            error!("{} {} {:?}",err.kind(), err.to_string(),err.url());
-           // Err(InterialError::boxed("Failed to make request"));
+        Err(err) => {
+            error!("{}",err);
+            Err(InterialError::boxed("Failed to make request"))
         }
     }
-
-    Ok(0)
 }
 
-
-fn authenticate_width_xsts(xbl_token: String) -> WithException<XSTSJson> {
-    let agent: ureq::Agent = get_user_agent();
+/// same reasons as with func authenticate_with_xbl
+async fn authenticate_width_xsts(xbl_token: String) -> WithException<XboxLiveJson> {
+    let client = ClientBuilder::new().build().expect("Failed to make http client");
 
     let payload = json!({
         "Properties": {
@@ -230,18 +309,31 @@ fn authenticate_width_xsts(xbl_token: String) -> WithException<XSTSJson> {
         "TokenType": "JWT"
     });
 
-    match agent
-    .post("https://xsts.auth.xboxlive.com/xsts/authorize")
-    .set("Content-Type", "application/json")
-    .set("Accept", "application/json")
-    .send_json(payload) {
+    let mut headers: HashMap<String,String> = HashMap::new();
+    headers.insert("Accept".to_string(), "application/json".to_string());
+    headers.insert("Content-Type".to_string(),"application/json".to_string());
+    headers.insert("User-Agent".to_string(),"rusty-minecraft-launcher/1.0.0".to_string());
+
+    let request_builder = HttpRequestBuilder::new("POST", "https://xsts.auth.xboxlive.com/xsts/authorize");
+    let request = request_builder.body(Body::Json(payload)).response_type(ResponseType::Json).headers(headers);
+
+    match client.send(request).await {
         Ok(value) => {
-            debug!("{:#?}",value);
-            match value.into_json::<XSTSJson>() {
-                Ok(json) => Ok(json),
+            match value.read().await {
+                Ok(response) => {
+                    match serde_json::from_value::<XboxLiveJson>(response.data) {
+                        Ok(result) => {
+                            Ok(result)
+                        }
+                        Err(err) => {
+                            error!("{}",err);
+                            Err(InterialError::boxed("Failed to convert to struct"))
+                        }
+                    }
+                }
                 Err(err) => {
                     error!("{}",err);
-                    Err(InterialError::boxed("Failed to transfrom data"))
+                    Err(InterialError::boxed("Failed to read response"))
                 }
             }
         }
@@ -280,13 +372,49 @@ fn authenticate_with_minecraft(userhash: String, xsts_token: String) -> WithExce
     }
 }
 
+fn check_game_ownership(access_token: String) -> WithException<()> {
+    let agent: ureq::Agent = get_user_agent();
+
+    let response: GameOwnership = match agent.get("https://api.minecraftservices.com/entitlements/mcstore")
+    .set("Authorization", format!("Bearer {}",access_token).as_str()).call() {
+        Ok(value) => {
+            match value.into_json::<GameOwnership>() {
+                Ok(res) => {
+                    res
+                }
+                Err(err) => {
+                    error!("{}",err);
+                    return Err(InterialError::boxed("Failed to parse response"));
+                }
+            }
+        }
+        Err(ureq::Error::Status(code, response)) => {
+            error!("Status: {} | {:?}",code,response.into_string());
+            return Err(InterialError::boxed("Failed to make request"));
+        }
+        Err(ureq::Error::Transport(err)) => {
+            error!("{} {} {:?}",err.kind(), err.to_string(),err.url());
+            return Err(InterialError::boxed("Failed to make request"));
+        }
+    };
+
+
+    if response.items.is_empty() {
+        return Err(ExternalProgramError::boxed("Account does not own a copy of minecraft", "", "", ""));
+    }
+
+    warn!("Did not check jwt signatures, may not be legitimate");
+  
+
+    Ok(())
+}
+
 fn get_profile(token: String) -> WithException<PlayerProfile> {
     let agent: ureq::Agent = get_user_agent();
 
     match agent.get("https://api.minecraftservices.com/minecraft/profile")
     .set("Authorization", format!("Bearer {}",token).as_str()).call() {
         Ok(value) => {
-            debug!("{:#?}",value);
             match value.into_json::<PlayerProfile>() {
                 Ok(value) => Ok(value),
                 Err(err) => {
@@ -302,44 +430,92 @@ fn get_profile(token: String) -> WithException<PlayerProfile> {
     }
 }
 
-pub fn complete_login(client_id: String, client_secret: String, redirect_uri: String, auth_code: String) -> WithException<()> {
+pub async fn complete_login(client_id: String, client_secret: String, redirect_uri: String, auth_code: String) -> Result<Account,String> {
 
     let authorization: OAuth2LoginJson = match get_authorization_token(client_id, client_secret, redirect_uri, auth_code) {
         Ok(value) => value,
-        Err(error) => return Err(error)
+        Err(error) => return Err(error.to_string())
     };
 
-    debug!("{:#?}", authorization);
-
-    let xbl_request = match authenticate_with_xbl(authorization.access_token.clone()) {
+    let xbl_request: XboxLiveJson = match authenticate_with_xbl(authorization.access_token.clone()).await {
         Ok(value) => value,
-        Err(error) => return Err(error)
+        Err(error) => return Err(error.to_string())
     };
 
-    //let xbl_token = xbl_request.token.clone();
-   // let userhash = xbl_request.display_claims.xui.get(0).expect("Failed to get claim").uhs.clone();
-/*
-    let xsts_request: XSTSJson = match authenticate_width_xsts(xbl_token) {
+    let xbl_token = xbl_request.token.clone();
+    let userhash = xbl_request.display_claims.xui.get(0).expect("Failed to get claim").uhs.clone();
+
+    let xsts_request: XboxLiveJson = match authenticate_width_xsts(xbl_token).await {
         Ok(value) => value,
-        Err(err) => return Err(err)
+        Err(err) => return Err(err.to_string())
     };
     
     let account_request: MinecraftJson = match authenticate_with_minecraft(userhash, xsts_request.token) {
         Ok(value) => value,
-        Err(err) => return Err(err)
+        Err(err) => return Err(err.to_string())
     };
 
-    let mut profile: PlayerProfile = match get_profile(account_request.access_token.clone()) {
+    if let Err(err) = check_game_ownership(account_request.access_token.clone()) {
+        return Err(err.to_string());
+    }
+
+    let profile: PlayerProfile = match get_profile(account_request.access_token.clone()) {
         Ok(value) => value,
-        Err(err) => return Err(err)
+        Err(err) => return Err(err.to_string())
     };
 
-    profile.access_token = Some(account_request.access_token);
-    profile.refresh_token = Some(token_request.refresh_token);
+    let account = Account {
+        profile: profile.clone(),
+        access_token: account_request.access_token,
+        refresh_token: authorization.refresh_token
+    };
 
-    Ok(profile)*/
+    match app_dir(AppDataType::UserConfig, &APP_INFO,"/") {
+        Ok(value) => {
+            let file_path = value.join("user_cache.yml");
+            match file_path.is_file() {
+                false => {
+                    let data = File::create(file_path).expect("Failed to create file");
+                    let groups = HashMap::from([
+                        (profile.id.clone(), account.clone())
+                    ]);
+                    if let Err(err) = serde_yaml::to_writer(data, &groups) {
+                        error!("{}",err);
+                    }
+                }
+                true => {
+                    let data = File::open(file_path.clone()).expect("Failed to open file");
+                    let cache = match serde_yaml::from_reader::<File,HashMap<String,Account>>(data) {
+                        Ok(mut cache) => {
+                            cache.insert(profile.id.clone(),account.clone());
+                            cache
+                        }
+                        Err(err) => {
+                            error!("{}",err);
+                            return Err("Failed to write cache".to_string());
+                        }
+                    };
 
-    Ok(())
+                    match serde_yaml::to_string(&cache) {
+                        Ok(saved) => {
+                            if let Err(err) = write(file_path,saved) {
+                                error!("{}",err);
+                            }
+                        }
+                        Err(err) => {
+                            error!("{}",err);
+                        }
+                    }
+                }
+            }
+            
+        }
+        Err(err) => {
+            error!("{}",err);
+        }
+    }
+
+    Ok(account)
 }
 
 pub fn complete_refresh(client_id: String, client_secret: String, redirect_uri: String, refresh_token: String) -> WithException<PlayerProfile> {

@@ -10,10 +10,29 @@ import{ LinkedButton } from '../LinkedButton';
 import ListButton from '../ListButton';
 import { appWindow } from '@tauri-apps/api/window';
 import { useEffect, useState } from 'react';
+import Accounts from '../../core/accounts';
+import { useRecoilValue } from 'recoil';
+import { active_user } from '../state/stateKeys';
 
 export default function Header(){
     const naviagate = useNavigate();
     const [isMaximized,setIsMaximized] = useState<boolean>(false);
+    const [user,setUser] = useState<string>("USERNAME");
+    const active = useRecoilValue(active_user);
+
+    useEffect(()=>{
+        const init = async () => {
+            const data = await new Accounts().getUser(active);
+            if(data) {
+                setUser(data.profile.name);
+            } else {
+                setUser("USERNAME");
+            }
+        }
+        init();
+    },[active]);
+
+
     useEffect(()=>{
         const init = async () => {
             const maximized = await appWindow.isMaximized();
@@ -45,11 +64,11 @@ export default function Header(){
                     </ListButton>
                     <Box id="app-header-acccount-select">
                         <Avatar variant="square" sx={{ color: "white", width: 31, height: 31 }}/>
-                        <ListButton name="USERNAME" btnProps={{ sx: { borderRadius: 0  }, variant:"outlined", color: "primary", size: "small", endIcon: <KeyboardArrowDownIcon/> }}>
+                        <ListButton name={user} btnProps={{ sx: { borderRadius: 0  }, variant:"outlined", color: "primary", size: "small", endIcon: <KeyboardArrowDownIcon/> }}>
                             {({handleClose}: any)=> [
                                 <MenuItem key={1} onClick={()=>{ handleClose(); naviagate("/settings"); }}>Accounts</MenuItem>,
                                 <Divider key={3}/>,
-                                <MenuItem key={2} onClick={handleClose}>Logout: USERNAME</MenuItem>
+                                <MenuItem key={2} onClick={()=>{ new Accounts().removeAccount(active ?? ""); handleClose();}}>Logout: {user}</MenuItem>
                                    
                             ]}
                         </ListButton>

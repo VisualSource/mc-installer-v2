@@ -1,5 +1,4 @@
-import {atom} from 'recoil';
-
+import { atom } from 'recoil';
 export const startup_modal = atom({
     key: "STARTUP_MODAL",
     default: false
@@ -44,20 +43,14 @@ export const modpack_install_dialog = atom<{show: boolean; pack: string | null}>
     }
 });
 
+export const active_user = atom<string | undefined>({
+    key: "ACTIVE_USER",
+    default: localStorage.getItem("active_user") ?? undefined
+})
 
-export interface MSAccounts {
-    active: boolean
-    uuid: string;
-    email: string;
-    username: string;
-}
 
-export const ms_accounts = atom<MSAccounts[]>({
-    key: "MS_ACCOUNTS",
-    default: [{
-        active: true,
-        uuid: "",
-        email: "boomishere_network@outlook.com",
-        username: "Visualsource"
-    }]
-}); 
+
+
+
+
+ 

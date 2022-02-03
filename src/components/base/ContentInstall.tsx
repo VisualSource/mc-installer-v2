@@ -10,6 +10,7 @@ import DB, { Loader, Mod } from "../../core/db";
 import GetAppIcon from '@mui/icons-material/GetApp';
 import EditIcon from '@mui/icons-material/Edit';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import DownloadIcon from '@mui/icons-material/Download';
 import BackgroundImage from '../../images/background.jpg';
 import { run_minecraft, run_install } from '../../core/cmds';
 export function ProfileInfo(props: { mc_version: string, loader: string, links: { name: string, path: string }[] }){
@@ -162,7 +163,6 @@ function Actions({type, content}: { content: any, type: "mod" | "modpack" | "pro
             return (
                 <>
                     <Button size="small" startIcon={<PlayArrowIcon/>} color={gameRunning ? "warning" : "primary"} variant="contained" onClick={()=>{setStartupDialog(true); run_minecraft({ profile: content.uuid }); }} disabled={gameRunning}>{ gameRunning ? "PLAYING" : "PLAY" }</Button>
-                    <Button size="small" startIcon={<PlayArrowIcon/>} variant="contained" onClick={()=>{setStartupDialog(true); run_install() }}>INSTALL</Button>
                     <Button size="small" variant="contained" startIcon={<EditIcon/>} onClick={()=>setEditProfile({show: true, profile: content.uuid})}>EDIT</Button>
                     <div id="profile-played">
                         <Typography sx={{ fontSize: 15 }} variant="subtitle1">LAST PLAYED</Typography>
@@ -171,7 +171,7 @@ function Actions({type, content}: { content: any, type: "mod" | "modpack" | "pro
                 </>
             );
         case "modpack":
-            return <Button size="small" startIcon={<GetAppIcon/>} variant="contained" onClick={()=>setModpack({show: true, pack: content.uuid})}>INSTALL</Button>;
+            return <Button size="small" startIcon={<GetAppIcon/>} variant="contained" onClick={()=> { run_install({ profile: content.uuid }); setModpack({show: true, pack: content.uuid})}}>INSTALL</Button>;
         default:
             return null;
     }

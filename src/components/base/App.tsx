@@ -9,8 +9,6 @@ import Downloads from "../Downloads";
 import Settings from "../Settings";
 
 import SettingsAccount from "../settings/SettingsAccount";
-import SettingsDownloads from "../settings/SettingsDownloads";
-import SettingsMinecraft from "../settings/SettingsMinecraft";
 import Home from "../Home";
 
 import StartUp from "../modals/StartUp";
@@ -35,8 +33,6 @@ export default function App(){
                    <Route path="/" element={<Home/>} />
                    <Route path="settings" element={<Settings/>}>
                         <Route index element={<SettingsAccount/>}/>
-                        <Route path="downloads" element={<SettingsDownloads/>}/>
-                        <Route path="minecraft" element={<SettingsMinecraft/>}/>
                    </Route>
                    <Route path="cdn" element={<ContentSort/>}>
                         <Route path="mods" element={<ContentList type="mod"/>}/>

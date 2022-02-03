@@ -37,7 +37,8 @@
     "eject": "react-scripts eject",
     "doc:py": "start ./launcher_lib/builddocs/index.html",
     "doc:rs": "cd ./src-tauri && cargo doc --open && cd ..",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "update": "tauri deps upgrade"
   },
   "eslintConfig": {
     "extends": [

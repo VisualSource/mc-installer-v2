@@ -1,6 +1,9 @@
-use crate::minecraft::microsoft_account::{ get_logout_url, PlayerProfile, complete_refresh, get_login_url, get_auth_code_from_url, url_contains_auth_code, complete_login };
+use crate::minecraft::microsoft_account::{ Account, get_logout_url, PlayerProfile, complete_refresh, get_login_url, get_auth_code_from_url, url_contains_auth_code, complete_login };
+use crate::app::APP_INFO;
+use std::fs::File;
 use tauri::{ WindowUrl, WindowBuilder, Manager };
-use log::{ error, warn, debug };
+use app_dirs2::{AppDataType,app_dir};
+use log::{ error, warn };
 use std::path::PathBuf;
 
 const CLIENT_ID: &str = env!("MICROSOFT_CLIENT_ID");
@@ -22,8 +25,7 @@ pub async fn ms_login_done(window: tauri::Window, url: Option<String>) {
         if url_contains_auth_code(url.clone().expect("Failed to get url")) {
             match get_auth_code_from_url(url.expect("Failed to get url")) {
                 Ok(auth) => {
-                    debug!("ATUTH CODE {}",auth);
-                    match complete_login(String::from(CLIENT_ID),String::from(CLIENT_SECRET),String::from(REDIRECT_URI),auth) {
+                    match complete_login(String::from(CLIENT_ID),String::from(CLIENT_SECRET),String::from(REDIRECT_URI),auth).await {
                         Ok(value) => {
                             if let Err(error) = window.emit_to("main", "mcrust://login_micosoft", value) {
                                 error!("{}",error);
@@ -114,5 +116,32 @@ pub async fn refresh_microsoft_account(refresh_token: String) -> Result<PlayerPr
                 error!("{}",err);
                 Err(err.to_string())
             }
+    }
+}
+
+#[tauri::command]
+pub async fn read_user_cache() -> Result<std::collections::HashMap<String,Account>,String> {
+    match app_dir(AppDataType::UserConfig, &APP_INFO, "/") {
+        Ok(path) => {
+            match File::open(path.join("user_cache.yml")) {
+                Ok(file) => {
+                    match serde_yaml::from_reader::<File, std::collections::HashMap<String,Account>>(file) {
+                        Ok(data) => Ok(data),
+                        Err(err) => {
+                            error!("{}",err);
+                            Err("Failed to parse content".to_string())
+                        }
+                    }
+                }
+                Err(err) => {
+                    error!("{}",err);
+                    Err("Failed to open cache".to_string())
+                }
+            }
+        }
+        Err(err) => {
+            error!("{}",err);
+            Err("Failed to get app dir".to_string())
+        }
     }
 }

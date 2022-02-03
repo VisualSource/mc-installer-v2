@@ -13,7 +13,6 @@ extern crate os_version;
 extern crate uuid;
 extern crate simplelog;
 extern crate log;
-extern crate url;
 extern crate urlparse;
 
 mod app;
@@ -38,7 +37,8 @@ use commands::{
      ms_login_done,
      refresh_microsoft_account,
      logout_microsoft_account,
-     ms_logout_done
+     ms_logout_done,
+     read_user_cache
    } };
 
 fn main() {
@@ -57,7 +57,8 @@ fn main() {
         get_minecraft_news,
         refresh_microsoft_account,
         run_minecraft,
-        run_install
+        run_install,
+        read_user_cache
       ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

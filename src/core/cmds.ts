@@ -32,8 +32,12 @@ export interface MinecraftNews {
     } | null
 }
 
-export const logout_microsoft = (): Promise<any> => {
-    return invoke<void>("logout_microsoft_account");
+export const get_cached_users = (): Promise<any> => {
+    return invoke("read_user_cache");
+}
+
+export const logout_microsoft = (uuid: string): Promise<any> => {
+    return invoke<void>("logout_microsoft_account", { uuid });
 }
 export const login_microsoft = (): Promise<any> => {
     return new Promise((ok,err)=>{
@@ -90,13 +94,16 @@ export const get_minecraft_news = (documents: number = 20) => {
     return invoke<MinecraftNews[]>("get_minecraft_news",{ documents: documents.toString() });
 }
 
-export const run_install = (): Promise<void> => {
-    return invoke<void>("run_install",{ manifest: {
+export const run_install = ({ profile }: { profile: string }): Promise<void> => {
+    let db = new DB();
+
+    return;
+    /*return invoke<void>("run_install",{ manifest: {
         loader: "fabric",
         version: "1.18.1",
         mods: [],
         uuid: nanoid()
-    } });
+    } });*/
 }
 
 export const run_minecraft = async (options: { profile: UUID }) => {
