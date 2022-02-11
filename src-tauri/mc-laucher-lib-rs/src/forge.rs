@@ -1,0 +1,269 @@
+use crate::expections::{ LauncherLibError, LibResult };
+use crate::utils::download_file;
+use crate::mod_utiles::get_metadata;
+use crate::runtime::get_exectable_path;
+use crate::vanilla::install_minecraft_version;
+use crate::json::{
+    runtime::MinecraftJavaRuntime,
+    install::{ Callback, Event }
+};
+use std::process::{ Command,Stdio };
+use std::fs::remove_file;
+use std::path::PathBuf;
+
+const FORGE_DOWNLOAD_URL: &str = "https://files.minecraftforge.net/maven/net/minecraftforge/forge/{version}/forge-{version}-installer.jar";
+const FORGE_HEADLESS_URL: &str = "https://github.com/TeamKun/ForgeCLI/releases/download/1.0.1/ForgeCLI-1.0.1-all.jar";
+const FORGE_MAVEN_ROOT: &str = "https://maven.minecraftforge.net/net/minecraftforge/forge/";
+
+pub fn get_forge_versions() -> LibResult<Vec<String>> {
+    match get_metadata(FORGE_MAVEN_ROOT) {
+        Ok(value) => {
+            Ok(value.versioning.versions.version)
+        },
+        Err(err) => return Err(err)
+    }
+}
+
+pub fn is_supported(mc: String) -> LibResult<bool> {
+    match get_forge_versions() {
+        Ok(versions) => {
+            for version in versions {
+                if let Some(forge) = version.split("-").collect::<Vec<&str>>().get(0) {
+                    if *forge == &mc {
+                        return Ok(true);
+                    }
+                }
+            }
+            return Ok(false);
+        }
+        Err(err) => Err(err)
+    }
+}
+
+pub fn vaild_forge_version(forge: String, mc: Option<String>) -> LibResult<bool> {
+    match get_forge_versions() {
+        Ok(versions) => {
+            for version in versions {
+                let data = version.split("-").collect::<Vec<&str>>();
+                if let Some(loader) = data.get(1) {
+                    let vaild = *loader == &forge;
+
+                    if let Some(mc_v) = &mc {
+                        if let Some(minecraft) = data.get(0) {
+                            if vaild && (mc_v == minecraft) {
+                                return Ok(true);
+                            } 
+                        }
+                    }
+
+                    if vaild {
+                        return Ok(true);
+                    }
+                }
+            }
+
+            Err(LauncherLibError::NotFound(forge))
+        }
+        Err(err) => Err(err)
+    }
+}
+
+pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback: Callback, java: Option<PathBuf>, loader: Option<String>, cache_path: Option<PathBuf>) -> LibResult<()> {
+
+    let loader_version = match loader {
+        Some(value) => {
+            match vaild_forge_version(value.clone(), Some(mc.clone())) {
+                Ok(r) => {
+                    if !r {
+                        return Err(LauncherLibError::Unsupported(mc));
+                        
+                    }
+                    value
+                }
+                Err(err) => return Err(err)
+            }
+        }
+        None => {
+            match get_forge_versions() {
+                Ok(versions) => {
+                    let mut data = String::default();
+                    for version in versions {
+                        let content = version.split("-").collect::<Vec<&str>>();
+                        if let Some(forge) = content.get(0) {
+                            if *forge == &mc {
+                                if let Some(value) = content.get(1) {
+                                    data = value.to_string();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if data.is_empty() {
+                        return Err(LauncherLibError::NotFound(mc.clone()));
+                    }
+
+                    data
+                }
+                Err(err) => return Err(err) 
+            }
+        }
+    };
+
+    let headless_path = match cache_path.clone() {
+        Some(value) => value,
+        None => temp_path.clone()
+    };
+
+    let forge_jar = match cache_path.clone() {
+        Some(value) => value,
+        None => temp_path.clone()
+    };
+
+    if !mc_dir.join("versions").join(mc.clone()).join(format!("{}.json",mc.clone())).is_file() {
+        if let Err(err) = install_minecraft_version(mc.clone(), mc_dir.clone(), callback) {
+            return Err(err);
+        }
+    }
+
+    let forge_id = format!("{}-forge-{}",mc.clone(),loader_version.clone()).to_string();
+
+    let headless_file = headless_path.join("forge-installer-headless.jar");
+    let forge_jar_file = forge_jar.join(format!("{}.jar",forge_id.clone()));
+
+    callback(Event::progress(0, 2));
+    if let Err(err) = download_file(FORGE_HEADLESS_URL.into(), headless_file.clone(), callback, None, false) {
+        return Err(err);
+    }
+    callback(Event::progress(1, 2));
+
+    
+    let forge_url = FORGE_DOWNLOAD_URL.replace("{version}", format!("{}-{}",mc.clone(),loader_version.clone()).as_str()).to_string();
+   
+    if let Err(err) = download_file(forge_url, forge_jar_file.clone(), callback, None, false) {
+        return Err(err);
+    }
+    callback(Event::progress(2, 2));
+
+    let exec: String = match java {
+        Some(value) => value.to_str().expect("Failed to make string").into(),
+        None => {
+            match get_exectable_path(MinecraftJavaRuntime::JavaRuntimeBeta, mc_dir.clone()) {
+                Ok(value) => {
+                    match value {
+                        Some(j) => j.to_str().expect("Failed to make string").into(),
+                        None => "java".into()
+                    }
+                }
+                Err(err) => return Err(err)
+            }
+        }
+    };
+
+    let args = [
+        "-jar",
+        headless_file.to_str().expect("Failed to make str"),
+        "--installer",
+        forge_jar_file.to_str().expect("Failed to make str"),
+        "--target",
+        mc_dir.to_str().expect("Failed to convert to str")
+    ];
+
+    println!("{}",exec);
+    match Command::new(exec).args(args).stdout(Stdio::inherit()).output() {
+        Ok(output) => {
+            eprintln!("{}",String::from_utf8_lossy(&output.stderr));
+            callback(Event::Status(String::from_utf8_lossy(&output.stderr).to_string()));
+            callback(Event::Status(String::from_utf8_lossy(&output.stdout).to_string()));
+            callback(Event::Status(output.status.to_string()));
+
+            if cache_path.is_none() {
+                if let Err(err) = remove_file(headless_file) {
+                    return Err(LauncherLibError::OS {
+                        source: err,
+                        msg: "Failed to remove forge headless runner".into()
+                    });
+                }
+                if let Err(err) = remove_file(forge_jar_file) {
+                    return Err(LauncherLibError::OS {
+                        source: err,
+                        msg: "Failed to remove forge installer jar".into()
+                    });
+                }
+            }
+        }
+        Err(err) => return Err(LauncherLibError::OS {
+            source: err,
+            msg: "Failed to run command".into()
+        }) 
+    };
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_install_forge() {
+        let mc_dir = PathBuf::from("C:\\Users\\Collin\\AppData\\Roaming\\.minecraft");
+        let temp_path = PathBuf::from("C:\\Users\\Collin\\Downloads\\");
+        let cache_path = PathBuf::from("C:\\Users\\Collin\\Downloads\\");
+        if let Err(err) = install_forge("1.18.1".into(), mc_dir, temp_path, |e|{ println!("{:#?}",e) }, None, None, Some(cache_path)) {
+            eprintln!("{}",err);
+        }
+    }
+
+    #[test]
+    fn test_get_forge_versions() {
+        match get_forge_versions() {
+            Ok(value) => println!("{:#?}",value),
+            Err(err) => eprintln!("{}",err)
+        }
+    }
+
+    #[test]
+    fn test_forge_is_supported() {
+        match is_supported("1.18.1".into()) {
+            Ok(value) => {
+                assert_eq!(value,true);
+            }
+            Err(err) => {
+                eprintln!("{}",err);
+                panic!();
+            }
+        }
+        match is_supported("1.56.1".into()) {
+            Ok(value) => {
+                assert_eq!(value,false);
+            }
+            Err(err) => {
+                eprintln!("{}",err);
+                panic!();
+            }
+        }
+    }
+
+    #[test]
+    fn test_vaild_forge_version() {
+        match vaild_forge_version("39.0.75".into(),None) {
+            Ok(value) => {
+                assert_eq!(value,true);
+            }
+            Err(err) => {
+                eprintln!("{}",err);
+                panic!();
+            }
+        }
+        match vaild_forge_version("39.0.75".into(),Some("1.18.1".into())) {
+            Ok(value) => {
+                assert_eq!(value,true);
+            }
+            Err(err) => {
+                eprintln!("{}",err);
+                panic!();
+            }
+        }
+    }
+
+}

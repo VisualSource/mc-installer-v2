@@ -1,4 +1,4 @@
-use crate::minecraft::microsoft_account::{ Account, get_logout_url, PlayerProfile, complete_refresh, get_login_url, get_auth_code_from_url, url_contains_auth_code, complete_login };
+/*use crate::minecraft::microsoft_account::{ Account, get_logout_url, PlayerProfile, complete_refresh, get_login_url, get_auth_code_from_url, url_contains_auth_code, complete_login };
 use crate::app::APP_INFO;
 use std::fs::File;
 use tauri::{ WindowUrl, WindowBuilder, Manager };
@@ -6,8 +6,8 @@ use app_dirs2::{AppDataType,app_dir};
 use log::{ error, warn };
 use std::path::PathBuf;
 
-const CLIENT_ID: &str = env!("MICROSOFT_CLIENT_ID");
-const CLIENT_SECRET: &str = env!("MICROSOFT_CLIENT_SECRET");
+//const CLIENT_ID: &str = env!("MICROSOFT_CLIENT_ID");
+//const CLIENT_SECRET: &str = env!("MICROSOFT_CLIENT_SECRET");
 const REDIRECT_URI: &str = "https://login.microsoftonline.com/common/oauth2/nativeclient";
 
 #[tauri::command]
@@ -144,4 +144,4 @@ pub async fn read_user_cache() -> Result<std::collections::HashMap<String,Accoun
             Err("Failed to get app dir".to_string())
         }
     }
-}
+}*/

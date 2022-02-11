@@ -6,7 +6,7 @@ authors = [ "VisualSource" ]
 license = "MIT"
 repository = ""
 default-run = "mc_rust_lancher"
-edition = "2018"
+edition = "2021"
 build = "src/build.rs"
 
 [build-dependencies]
@@ -26,19 +26,10 @@ tauri = { version = "1.0.0-beta.8", features = [
   "window-all"
 ] }
 app_dirs2 = "*"
-ureq = { version = "*", features = [ "json" ] }
-rust-crypto = "0.2.36"
-os-version = "0.2.0"
-zip = "0.5.13"
-regex = "1.5.4"
-lzma-rs = "0.2.0"
-serde_yaml = "0.8.23"
-serde-xml-rs = "0.5.1"
-uuid = { version = "0.8.2", features = [ "v4" ] }
-urlparse = "0.7.3"
 log = "0.4.14"
 simplelog = "0.11.2"
 jsonwebtoken = "7.2.0"
+mc-laucher-lib-rs = { path = "mc-laucher-lib-rs" }
 
 [features]
 default = [ "custom-protocol" ]

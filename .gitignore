@@ -10,7 +10,6 @@
 
 # production
 /build
-/launcher_lib
 
 # misc
 .DS_Store
