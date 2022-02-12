@@ -1,15 +1,12 @@
 use crate::expections::{LauncherLibError, LibResult };
 use crate::json::{
-    game_settings::GameOptions,
     install::{
         ExtractFile,
-        Library,
-        VersionManifest
+        Library
     }
 };
-use crate::utils::parse_rule_list;
 use std::env::consts;
-use std::fs::{ File, create_dir_all, read_to_string };
+use std::fs::{ File, create_dir_all };
 use std::path::PathBuf;
 use std::io::Read;
 use log::{ error };
@@ -105,8 +102,8 @@ pub fn get_library_data(name: String) -> LibResult<(String,String,String)> {
     Ok((data[0].into(),data[1].into(),data[2].into()))
 } 
 
-/// Extract natives into the givrn path.
-pub fn extract_natives(version_id: String, path: PathBuf, extract_path: PathBuf) -> LibResult<()> {
+// Extract natives into the givrn path.
+/*pub fn extract_natives(version_id: String, path: PathBuf, extract_path: PathBuf) -> LibResult<()> {
 
     let file = path.join("versions").join(version_id.clone()).join(format!("{}.json",version_id));
 
@@ -165,4 +162,4 @@ pub fn extract_natives(version_id: String, path: PathBuf, extract_path: PathBuf)
     }
 
     Ok(())
-}
+}*/

@@ -10,6 +10,7 @@ use crate::json::{
 use std::process::{ Command,Stdio };
 use std::fs::remove_file;
 use std::path::PathBuf;
+use log::{info};
 
 const FORGE_DOWNLOAD_URL: &str = "https://files.minecraftforge.net/maven/net/minecraftforge/forge/{version}/forge-{version}-installer.jar";
 const FORGE_HEADLESS_URL: &str = "https://github.com/TeamKun/ForgeCLI/releases/download/1.0.1/ForgeCLI-1.0.1-all.jar";
@@ -68,7 +69,7 @@ pub fn vaild_forge_version(forge: String, mc: Option<String>) -> LibResult<bool>
     }
 }
 
-pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback: Callback, java: Option<PathBuf>, loader: Option<String>, cache_path: Option<PathBuf>) -> LibResult<()> {
+pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback: Callback, cache_path: Option<PathBuf>, loader: Option<String>, java: Option<PathBuf>, cache_headless: bool, cache_installer: bool) -> LibResult<()> {
 
     let loader_version = match loader {
         Some(value) => {
@@ -110,16 +111,25 @@ pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback:
         }
     };
 
-    let headless_path = match cache_path.clone() {
-        Some(value) => value,
-        None => temp_path.clone()
+    let headless_path = if cache_headless {
+        match cache_path.clone() {
+            Some(value) => value,
+            None => temp_path.clone()
+        }
+    } else {
+        temp_path.clone()
     };
 
-    let forge_jar = match cache_path.clone() {
-        Some(value) => value,
-        None => temp_path.clone()
+    let forge_jar = if cache_installer {
+        match cache_path {
+            Some(value) => value,
+            None => temp_path.clone()
+        }
+    } else {
+        temp_path.clone()
     };
 
+    callback(Event::Status("Checking for vanilla minecraft".into()));
     if !mc_dir.join("versions").join(mc.clone()).join(format!("{}.json",mc.clone())).is_file() {
         if let Err(err) = install_minecraft_version(mc.clone(), mc_dir.clone(), callback) {
             return Err(err);
@@ -128,9 +138,10 @@ pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback:
 
     let forge_id = format!("{}-forge-{}",mc.clone(),loader_version.clone()).to_string();
 
-    let headless_file = headless_path.join("forge-installer-headless.jar");
+    let headless_file = headless_path.join("ForgeCLI.jar");
     let forge_jar_file = forge_jar.join(format!("{}.jar",forge_id.clone()));
 
+    callback(Event::Status("Downloading ForgeCLI".into()));
     callback(Event::progress(0, 2));
     if let Err(err) = download_file(FORGE_HEADLESS_URL.into(), headless_file.clone(), callback, None, false) {
         return Err(err);
@@ -139,7 +150,7 @@ pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback:
 
     
     let forge_url = FORGE_DOWNLOAD_URL.replace("{version}", format!("{}-{}",mc.clone(),loader_version.clone()).as_str()).to_string();
-   
+    callback(Event::Status("Downloading Forge".into()));
     if let Err(err) = download_file(forge_url, forge_jar_file.clone(), callback, None, false) {
         return Err(err);
     }
@@ -169,21 +180,25 @@ pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback:
         mc_dir.to_str().expect("Failed to convert to str")
     ];
 
-    println!("{}",exec);
     match Command::new(exec).args(args).stdout(Stdio::inherit()).output() {
         Ok(output) => {
-            eprintln!("{}",String::from_utf8_lossy(&output.stderr));
-            callback(Event::Status(String::from_utf8_lossy(&output.stderr).to_string()));
-            callback(Event::Status(String::from_utf8_lossy(&output.stdout).to_string()));
-            callback(Event::Status(output.status.to_string()));
+            info!("Stderr: {}",String::from_utf8_lossy(&output.stderr));
+            info!("Stdout: {}",String::from_utf8_lossy(&output.stdout));
+            info!("Status: {}",output.status);
+         
+            callback(Event::Status("Starting cleanup".into()));
+            callback(Event::progress(0, 2));
 
-            if cache_path.is_none() {
+            if !cache_headless {
                 if let Err(err) = remove_file(headless_file) {
                     return Err(LauncherLibError::OS {
                         source: err,
-                        msg: "Failed to remove forge headless runner".into()
+                        msg: "Failed to remove ForgeCLI.jar".into()
                     });
                 }
+            }
+            callback(Event::progress(1, 2));
+            if !cache_installer {
                 if let Err(err) = remove_file(forge_jar_file) {
                     return Err(LauncherLibError::OS {
                         source: err,
@@ -191,12 +206,14 @@ pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback:
                     });
                 }
             }
+            callback(Event::progress(2, 2));
         }
         Err(err) => return Err(LauncherLibError::OS {
             source: err,
             msg: "Failed to run command".into()
         }) 
     };
+    
     Ok(())
 }
 
@@ -204,16 +221,6 @@ pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback:
 mod tests {
     use super::*;
     
-    #[test]
-    fn test_install_forge() {
-        let mc_dir = PathBuf::from("C:\\Users\\Collin\\AppData\\Roaming\\.minecraft");
-        let temp_path = PathBuf::from("C:\\Users\\Collin\\Downloads\\");
-        let cache_path = PathBuf::from("C:\\Users\\Collin\\Downloads\\");
-        if let Err(err) = install_forge("1.18.1".into(), mc_dir, temp_path, |e|{ println!("{:#?}",e) }, None, None, Some(cache_path)) {
-            eprintln!("{}",err);
-        }
-    }
-
     #[test]
     fn test_get_forge_versions() {
         match get_forge_versions() {

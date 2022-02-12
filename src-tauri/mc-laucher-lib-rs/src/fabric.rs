@@ -22,11 +22,7 @@ pub struct FabricVersionItem {
 
 #[derive(Deserialize, Debug,Clone)]
 struct FabricLoaderVersion {
-    separator: String,
-    build: i32,
-    maven: String,
     version: String,
-    stable: bool
 }
 
 pub fn get_supported_mc_versions() -> LibResult<Vec<FabricVersionItem>> {
@@ -70,18 +66,6 @@ pub fn get_latest_supported() -> LibResult<String> {
     };
     match mc.get(0) {
         Some(version) => Ok(version.version.clone()),
-        None => Err(LauncherLibError::NotFound("Unknown".into()))
-    }
-}
-
-pub fn get_latest_supported_stable() -> LibResult<String> {
-    let versions = match get_supported_stable_versions() {
-        Ok(value) => value,
-        Err(err) => return Err(err)
-    };
-
-    match versions.get(0) {
-        Some(value) => Ok(value.version.clone()),
         None => Err(LauncherLibError::NotFound("Unknown".into()))
     }
 }
@@ -135,7 +119,7 @@ fn get_latest_installer() -> LibResult<String> {
     }
 }
 
-pub fn install_fabric(mc: String, mc_dir: PathBuf, loader: Option<String>, callback: Callback, java: Option<String>, temp_path: PathBuf) -> LibResult<()> {
+pub fn install_fabric(mc: String, mc_dir: PathBuf, loader: Option<String>, callback: Callback, java: Option<PathBuf>, temp_path: PathBuf) -> LibResult<()> {
 
     let mc_path = mc_dir.join("versions").join(mc.clone()).join(format!("{}.json",mc));
 
@@ -201,14 +185,14 @@ pub fn install_fabric(mc: String, mc_dir: PathBuf, loader: Option<String>, callb
     }
     callback(Event::progress(1, 1));
 
-    let exec = match java {
-        Some(value) => value,
+    let exec: String = match java {
+        Some(value) => value.to_str().expect("Failed to make string").into(),
         None => {
             match get_exectable_path(MinecraftJavaRuntime::JavaRuntimeBeta, mc_dir.clone()) {
                 Ok(value) => {
                     match value {
-                        Some(j) => String::from(j.to_str().expect("Failed to make path a string")),
-                        None => String::from("java")
+                        Some(j) => j.to_str().expect("Failed to make string").into(),
+                        None => "java".into()
                     }
                 }
                 Err(err) => return Err(err)
@@ -252,11 +236,18 @@ pub fn install_fabric(mc: String, mc_dir: PathBuf, loader: Option<String>, callb
     install_minecraft_version(fabric_mc, mc_dir, callback)
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_get_loader_versions() {
+        match get_loader_versions() {
+            Ok(value) => println!("{:#?}",value),
+            Err(err) => eprintln!("{}",err)
+        }
+    }
+
     #[test]
     fn test_get_supported_mc_versions() {
         match get_supported_mc_versions() {

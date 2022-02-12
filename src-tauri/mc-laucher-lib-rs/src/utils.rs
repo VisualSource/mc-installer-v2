@@ -358,7 +358,7 @@ pub fn download_file(url: String, output: PathBuf, callback: Callback, sha1: Opt
 }
 
 /// Parse the mainclass of a jar from META-INF/MANIFEST.MF
-pub fn get_jar_mainclass(path: PathBuf) -> LibResult<String> {
+/*pub fn get_jar_mainclass(path: PathBuf) -> LibResult<String> {
     use std::io::Read;
  
     match File::open(path.clone()) {
@@ -400,7 +400,7 @@ pub fn get_jar_mainclass(path: PathBuf) -> LibResult<String> {
             msg: "Failed to read file".into()
         })
     }
-}
+}*/
 
 /// Parse a single rule from versions.json in .minecraft
 pub fn parse_single_rule(rule: &Rule, options: &GameOptions) -> bool {
@@ -512,7 +512,7 @@ pub fn inherit_json(original_data: &VersionManifest, path: &PathBuf) -> LibResul
 
     for arg in inherit_data.arguments.game {
         new_data.arguments.game.push(arg.to_owned());
-    }
+    }  
 
     for arg in inherit_data.arguments.jvm {
         new_data.arguments.jvm.push(arg.to_owned());

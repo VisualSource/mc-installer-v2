@@ -1,3 +1,160 @@
+use crate::app::{ CLIENT_ID, REDIRECT_URI };
+use crate::files::{
+    user_cache::{
+        update_user_cache,
+        remove_user 
+    }
+};
+use mc_laucher_lib_rs::login::{ get_auth_code,login_microsoft,ms_login_url };
+use tauri::{ WindowUrl, WindowBuilder, Runtime, Manager };
+use log::{ error, warn };
+use std::path::PathBuf;
+
+fn create_window<R: Runtime>(app: tauri::AppHandle<R>,  title: String, label: String, url: String, ignore_url: String, done_script: String) -> Result<(),String>{
+    let raw_script = r#"
+        window.__open_url = "{open_url}";
+        window.__redirect = "{redirect}";
+        window.__ignore = "{ignore_url}";
+        window.__complete_func = "{complete_func}";
+        async function init() {
+            if(location.href.includes(window.__ignore)) return;
+            if(location.href === "chrome-error://chromewebdata/") {
+                __TAURI_INVOKE__("login_error", { err: "No Internet connection" });
+                return;
+            }
+            if(location.href.match(/^(https:\/\/login.microsoftonline.com\/common\/oauth2\/nativeclient)/)){
+                document.body.innerHTML = `
+                <div style="height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; align-content: center;">
+                    <h1>Loading Profile</h1>
+                    <div>Please Wait</div>
+                </div>`;
+                __TAURI_INVOKE__(window.__complete_func,{ url: location.href });
+                return;
+            }
+            location.replace(window.__open_url);
+        }
+        window.addEventListener("load",init);
+    "#;
+
+    let script = raw_script
+    .replace("{open_url}", url.as_str())
+    .replace("{complete_func}",done_script.as_str())
+    .replace("{ignore_url}", ignore_url.as_str())
+    .replace("{redirect}",REDIRECT_URI);
+
+    if let Err(err) = app.create_window(label,WindowUrl::App(PathBuf::from("/bootstrap.html")),|window_bulider,web_attr| { 
+        (window_bulider.title(title),web_attr.initialization_script(script.as_str()))
+    }) {
+        error!("{}",err);
+        return Err("Failed to create window".into())
+
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn login_error<R: Runtime>(window: tauri::Window<R>, err: String) -> Result<(), String> {
+    if let Err(error) = window.emit_to("main", "rustyminecraft://login_error", "Invaild auth code") {
+        error!("{}",error);
+    }
+    error!("Login Error: {}",err);
+  Ok(())
+}
+
+#[tauri::command]
+pub fn login_done<R: Runtime>(window: tauri::Window<R>, url: String) -> Result<(),()> {
+    if window.label() == "ms-login" {
+        if let Err(err) = window.close() {
+            error!("{}",err);
+        }
+
+        let code = match get_auth_code(url) {
+            Some(value) => value,
+            None => {
+                error!("Invaild auth code");
+                if let Err(error) = window.emit_to("main", "rustyminecraft://login_error","Invaild auth code".to_string()) {
+                    error!("{}",error);
+                }
+                return Err(());
+            }
+        };
+        let account = match login_microsoft(CLIENT_ID.into(), REDIRECT_URI.into(), code) {
+            Ok(value) => value,
+            Err(err) => {
+                error!("{}",err);
+                if let Err(error) = window.emit_to("main", "rustyminecraft://login_error",err.to_string()) {
+                    error!("{}",error);
+                }
+                return Err(());
+            }
+        };
+
+        if let Err(err) = update_user_cache(&account) {
+            error!("{}",err);
+            if let Err(error) = window.emit_to("main", "rustyminecraft://login_error",err.to_string()) {
+                error!("{}",error);
+            }
+            return Err(());
+        }
+
+        if let Err(error) = window.emit_to("main", "rustyminecraft://login_complete", account) {
+            error!("{}",error);
+            if let Err(error) = window.emit_to("main", "rustyminecraft://login_error","Invaild auth code".to_string()) {
+                error!("{}",error);
+            }
+            return Err(());
+        }
+    } else {
+        warn!("Did not expect window ({}) to call this command",window.label());
+    }
+  Ok(())
+}
+
+#[tauri::command]
+pub async fn login<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), String> {
+
+    let url = ms_login_url(CLIENT_ID.into(),REDIRECT_URI.into());
+
+    if let Err(err) = create_window(app, "Microsoft Login".into(), "ms-login".into(), url, "https://login.live.com/oauth20_authorize.srf".into(),"login_done".into()){
+        return Err(err);
+    }
+
+  Ok(())
+}
+
+#[tauri::command]
+pub async fn logout_done<R: Runtime>(window: tauri::Window<R>) -> Result<(), String> {
+    if window.label() == "ms-logout" {
+        if let Err(err) = window.close() {
+            error!("{}",err);
+        }
+    } else {
+        warn!("Did not expect window {} to call this function",window.label());
+    }
+    Ok(())
+}
+
+/// <https://stackoverflow.com/questions/39386633/how-to-signout-from-an-azure-application>
+/// <https://stackoverflow.com/questions/10005306/how-to-signout-from-windows-live-using-microsoft-live-controls-signin-button-inw>
+#[tauri::command]
+pub async fn logout<R: Runtime>(app: tauri::AppHandle<R>, xuid: String) -> Result<(), String> {
+    let url = format!("https://login.live.com/oauth20_logout.srf?client_id={client_id}&redirect_uri={redirect_uri}&scope=XboxLive.signin%20offline_access",client_id=CLIENT_ID,redirect_uri=REDIRECT_URI).to_string();
+    if let Err(err) = create_window(app,"Mincrosoft Logout".into(),"ms-logout".into(),url, "https://login.live.com/oauth20_logout.srf".into(),"logout_done".into()) {
+        return Err(err);
+    }
+
+    if let Err(err) = remove_user(xuid) {
+        return Err(err);
+    }
+   
+  Ok(())
+}
+
+
+
+
+
 /*use crate::minecraft::microsoft_account::{ Account, get_logout_url, PlayerProfile, complete_refresh, get_login_url, get_auth_code_from_url, url_contains_auth_code, complete_login };
 use crate::app::APP_INFO;
 use std::fs::File;
@@ -103,45 +260,4 @@ pub async fn login_microsoft_account(app_handle: tauri::AppHandle) {
     let login_url = get_login_url(String::from(CLIENT_ID),String::from(REDIRECT_URI));
     create_window(app_handle,"Mincrosoft Login".to_string(),"ms-login".to_string(),login_url,REDIRECT_URI,"https://login.live.com/oauth20_authorize.srf".to_string(),"ms_login_done".to_string());
 }
-
-#[tauri::command]
-pub async fn refresh_microsoft_account(refresh_token: String) -> Result<PlayerProfile,String> {
-    match complete_refresh(
-        String::from(CLIENT_ID),
-        String::from(CLIENT_SECRET),
-        String::from(REDIRECT_URI),
-        refresh_token) {
-            Ok(value) => Ok(value),
-            Err(err) => {
-                error!("{}",err);
-                Err(err.to_string())
-            }
-    }
-}
-
-#[tauri::command]
-pub async fn read_user_cache() -> Result<std::collections::HashMap<String,Account>,String> {
-    match app_dir(AppDataType::UserConfig, &APP_INFO, "/") {
-        Ok(path) => {
-            match File::open(path.join("user_cache.yml")) {
-                Ok(file) => {
-                    match serde_yaml::from_reader::<File, std::collections::HashMap<String,Account>>(file) {
-                        Ok(data) => Ok(data),
-                        Err(err) => {
-                            error!("{}",err);
-                            Err("Failed to parse content".to_string())
-                        }
-                    }
-                }
-                Err(err) => {
-                    error!("{}",err);
-                    Err("Failed to open cache".to_string())
-                }
-            }
-        }
-        Err(err) => {
-            error!("{}",err);
-            Err("Failed to get app dir".to_string())
-        }
-    }
-}*/
+*/

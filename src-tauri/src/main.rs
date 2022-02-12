@@ -5,28 +5,39 @@
 
 mod app;
 mod commands;
+mod files;
 use log::{ info };
+
+use commands::{
+  get_user_cache,
+  login::{
+    login,
+    login_done,
+    logout,
+    logout_done,
+    login_error
+  },
+  state::{
+    AppState, 
+    is_game_running
+  }
+};
 
 
 fn main() {
   app::init();
   info!("Init complete");
   tauri::Builder::default()
-     /* .invoke_handler(tauri::generate_handler![
-        login_microsoft_account,
-        logout_microsoft_account,
-        get_vanilla_versions,
-        get_fabric_verions,
-        get_forge_versions,
-        get_latest_minecraft_version,
-        ms_login_done,
-        ms_logout_done,
-        get_minecraft_news,
-        refresh_microsoft_account,
-        run_minecraft,
-        run_install,
-        read_user_cache
-      ])*/
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+  .manage(AppState::default())
+  .invoke_handler(tauri::generate_handler![
+    is_game_running,
+    login,
+    login_done,
+    logout,
+    login_error,
+    logout_done,
+    get_user_cache
+  ])
+  .run(tauri::generate_context!())
+  .expect("error while running tauri application");
 }

@@ -15,9 +15,7 @@ pub mod client {
         #[serde(rename="vanilla")]
         Vanilla,
         #[serde(rename="optifine")]
-        Optifine,
-        #[serde(rename="iris")]
-        Iris
+        Optifine
     }
     impl Default for Loader {
         fn default() -> Self { Loader::Vanilla }
@@ -32,6 +30,9 @@ pub mod client {
 
     #[derive(Deserialize, Debug)]
     pub struct InstallManifest {
+        pub cache_install: bool,
+        pub cache_cli: bool,
+        pub cache_mods: bool,
         pub minecraft: String,
         pub modloader_version: Option<String>,
         pub modloader: Loader,
@@ -44,6 +45,9 @@ pub mod client {
                 modloader,
                 modloader_version: None,
                 mods: vec![],
+                cache_cli: false,
+                cache_install: false,
+                cache_mods: false
             }
         }
     } 
@@ -223,7 +227,7 @@ pub mod game_settings {
         pub navtives_directory: Option<PathBuf>,
         pub classpath: Option<String>,
         pub executable_path: Option<PathBuf>,
-        pub java_arguments: Option<String>,
+        pub jvm_arguments: Option<String>,
         pub custom_resolution: Option<String>,
         pub demo: bool,
         pub launcher_name: Option<String>,
@@ -419,6 +423,7 @@ pub mod install {
     #[derive(Deserialize, Debug, Clone)]
     pub struct Arguments {
         pub game: Vec<Argument>,
+        #[serde(default)]
         pub jvm: Vec<Argument>
     }
     

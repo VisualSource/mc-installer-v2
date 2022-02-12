@@ -4,6 +4,8 @@ use std::boxed::Box;
 use std::fs::File;
 use std::env;
 
+pub const CLIENT_ID: &str = env!("CLIENT_ID");
+pub const REDIRECT_URI: &str = "https://login.microsoftonline.com/common/oauth2/nativeclient";
 pub const APP_INFO: AppInfo = AppInfo{ name: "MCRustLauncher", author: "VisualSource"};
 
 /// Setsup app_root and logger

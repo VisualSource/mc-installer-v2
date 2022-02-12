@@ -64,16 +64,20 @@ fn replace_argument(ogargs: String, manifest: &VersionManifest, path: &PathBuf, 
     let mut argstr = ogargs;
 
     argstr = argstr.replace("${game_assets}", path.join("assets").join("virtual").join("legacy").to_str().expect("Failed to make string"));
-
-    argstr = argstr.replace("${game_assets}", path.join("libraries").to_str().expect("Failed to make string"));
+    
+    let lib_path = path.join("libraries").to_str().expect("Failed to make str").to_string();
+    argstr = argstr.replace("${game_assets}", &lib_path);
+    argstr = argstr.replace("${library_directory}", &lib_path);
 
     argstr = argstr.replace("${game_assets}", &get_classpath_separator());
-
+    
     argstr = argstr.replace("${version_name}", &manifest.id);
 
     argstr = argstr.replace("${assets_root}", path.join("assets").to_str().expect("Failed to make string"));
 
     argstr = argstr.replace("${user_type}", &options.user_type.to_string());
+
+    argstr = argstr.replace("${classpath_separator}", &get_classpath_separator());
 
     argstr = argstr.replace("${user_properties}", "{}");
 
@@ -210,8 +214,9 @@ pub fn get_launch_command(version: String, mc_dir: PathBuf, options: &mut GameOp
         command.push("java".into())
     }
 
-    if let Some(args) = options.java_arguments.clone() {
-        command.push(args);
+    if let Some(args) = options.jvm_arguments.clone() {
+        let mut jvm_args = args.split(" ").map(|e|e.to_string()).collect::<Vec<String>>();
+        command.append(&mut jvm_args);
     }
 
     let mut jvm_args = get_arguments(&manifest.arguments.jvm, &manifest, mc_dir.clone(), &options);

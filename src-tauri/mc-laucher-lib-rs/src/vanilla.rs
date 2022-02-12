@@ -118,7 +118,7 @@ fn install_libraries(id: String, libraries: &Vec<Library>, path: PathBuf, callba
 #[derive(Deserialize)]
 struct IndexAssetsItem {
     hash: String,
-    size: usize
+    //size: usize
 }
 #[derive(Deserialize)]
 struct IndexAssetsMap {
@@ -154,6 +154,7 @@ fn install_assets(manifest: &VersionManifest, path: PathBuf, callback: Callback)
         let max = assets.objects.len();
         let mut count = 0;
         for (key, value) in assets.objects {
+            callback(Event::Status(format!("Asset: {}",key)));
             let pre = value.hash.get(0..2).expect("Should have this value");
             let url = format!("https://resources.download.minecraft.net/{}/{}",pre,value.hash.clone());
             let outpath = path.join("assets").join("objects").join(pre).join(value.hash.clone());
