@@ -25,8 +25,6 @@ export interface MicrosoftAccount {
             alias: string | null;
         }[]
     }
-    access_token: string;
-    refresh_token: string;
     xuid: string;
 }
 
@@ -34,19 +32,20 @@ export interface UserCache {
     [xuid: string]: MicrosoftAccount
 }
 
-export async function login() {
+export async function login(): Promise<MicrosoftAccount> {
     return new Promise(async(ok,err)=>{
         let unlisenError: Function;
         let unlisenLogin: Function;
-        unlisenError = await appWindow.once(WindowEvents.LoginError, async (event)=>{
+        unlisenError = await appWindow.once<string>(WindowEvents.LoginError, async (event)=>{
             unlisenLogin();
-            console.error(event);
             err(event);
         });
-        unlisenLogin = await appWindow.once(WindowEvents.LoginComplete, async (account)=>{
+        unlisenLogin = await appWindow.once<MicrosoftAccount>(WindowEvents.LoginComplete, async (account)=>{
             unlisenError();
-            console.log(account);
-            ok(account);
+            ok({
+                xuid: account.payload.xuid,
+                profile: account.payload.profile
+            });
         });
         invoke<void>("login");
     });
@@ -56,6 +55,12 @@ export async function user_cache(): Promise<UserCache> {
     return invoke<UserCache>("get_user_cache");
 }
 
-export async function logout(xuid: string): Promise<void> {
+export async function logout(xuid: string | undefined): Promise<void> {
+    if(!xuid) throw new Error("Can't logout user with invaild xuid");
+
     await invoke<void>("logout",{ xuid });
+}
+
+export async function get_minecraft_news(items: number = 20): Promise<any> {
+    return invoke("get_minecraft_news", { items });
 }

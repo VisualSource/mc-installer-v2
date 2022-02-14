@@ -10,6 +10,7 @@ use log::{ info };
 
 use commands::{
   get_user_cache,
+  get_minecraft_news,
   login::{
     login,
     login_done,
@@ -30,6 +31,7 @@ fn main() {
   tauri::Builder::default()
   .manage(AppState::default())
   .invoke_handler(tauri::generate_handler![
+    get_minecraft_news,
     is_game_running,
     login,
     login_done,

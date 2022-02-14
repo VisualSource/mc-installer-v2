@@ -1,0 +1,29 @@
+#vs-loader 
+    height: 100%
+    display: flex 
+    flex-direction: column 
+    justify-content: center
+    align-content: center 
+    align-items: center
+    > h6 
+        margin-top: 1rem
+        &::after
+            content: " "
+            animation: vs-loading-anim infinite 5s
+            
+            
+
+@keyframes vs-loading-anim
+    20%
+        content: " "
+    40% 
+        content: " ."
+    60% 
+        content: " .."
+    80% 
+        content: " ..."
+    90% 
+        content: " ...."
+    100% 
+        content: " ....."
+

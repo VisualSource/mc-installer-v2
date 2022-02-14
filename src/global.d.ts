@@ -1,5 +1,11 @@
 /// <reference types="zangodb" />
 
+namespace NodeJS {
+    interface ProcessEnv {
+        REACT_APP_CLIENT_VERSION: string
+    }
+}
+
 
 interface Window {
     _downloads: import("./core/downloads").default;

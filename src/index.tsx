@@ -1,12 +1,17 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import reportWebVitals from './reportWebVitals';
+import { QueryClient, QueryClientProvider, useQuery } from "react-query";
 import {createTheme, ThemeProvider} from '@mui/material/styles';
 import { BrowserRouter } from "react-router-dom";
 import {RecoilRoot} from 'recoil';
 import App from './components/App';
 
+import reportWebVitals from './reportWebVitals';
+import { ReactQueryDevtools } from "react-query/devtools";
+
 import "./index.sass";
+
+const queryClient = new QueryClient();
 
 const theme = createTheme({
   palette: {
@@ -14,18 +19,15 @@ const theme = createTheme({
   }
 });
 
-/*
-window._db = new DB();
-window._downloads = new Download();
-let _ = new Account();
-*/
-
 ReactDOM.render(
   <React.StrictMode>
     <RecoilRoot>
         <ThemeProvider theme={theme}>
             <BrowserRouter>
+              <QueryClientProvider client={queryClient}>
                 <App/>
+                <ReactQueryDevtools initialIsOpen position="bottom-right" />
+              </QueryClientProvider>
             </BrowserRouter>
         </ThemeProvider>
     </RecoilRoot>
