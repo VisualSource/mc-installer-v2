@@ -2,11 +2,11 @@ import { Outlet, useParams } from 'react-router-dom';
 import { useQuery } from 'react-query';
 import { Paper } from "@mui/material";
 import { Box, List } from '@mui/material';
-import Loader from './Loader';
-import ErrorMessage from './ErrorMessage';
+import Loader from '../Loader';
+import ErrorMessage from '../ErrorMessage';
 import TextListGroup, {TextListItem} from './TextListGroup';
 
-import { getListCategory } from '../lib/db';
+import { getListCategory } from '../../lib/db';
 
 export default function ListContainer(){
     const params = useParams();

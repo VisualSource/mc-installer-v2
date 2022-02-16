@@ -3,6 +3,7 @@ use tauri::api::http::{ClientBuilder, HttpRequestBuilder, ResponseType };
 use std::collections::HashMap;
 pub mod login;
 pub mod state;
+pub mod importer;
 
 const MINECRAFT_NEWS_URL: &str = "https://www.minecraft.net/content/minecraft-net/_jcr_content.articles.grid";
 
@@ -18,8 +19,8 @@ pub async fn get_minecraft_news(items: u32) -> Result<serde_json::Value, String>
     let headers = HashMap::from([
         ("user-agent".into(),format!("rustymodclient/{}",env!("CARGO_PKG_VERSION")))
     ]);
-    
-    let request = HttpRequestBuilder::new("GET", MINECRAFT_NEWS_URL).query(query).headers(headers).response_type(ResponseType::Json);
+
+    let request = HttpRequestBuilder::new("GET", MINECRAFT_NEWS_URL).unwrap().query(query).headers(headers).response_type(ResponseType::Json);
 
     match client.send(request).await {
         Ok(res) => {
@@ -36,7 +37,7 @@ pub async fn get_minecraft_news(items: u32) -> Result<serde_json::Value, String>
 
 
 #[tauri::command]
-pub async fn get_user_cache() -> Result<std::collections::HashMap<std::string::String, mc_laucher_lib_rs::Account>, String> {
+pub async fn get_user_cache() -> Result<std::collections::HashMap<std::string::String, mc_laucher_lib_rs::json::authentication_microsoft::Account>, String> {
     match read_user_cache() {
         Ok(value) => Ok(value),
         Err(err) => Err(err)

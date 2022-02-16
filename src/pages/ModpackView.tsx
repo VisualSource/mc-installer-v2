@@ -10,13 +10,13 @@ import SupportVersions from '../components/view/SupportVersions';
 import ResourceLinks from '../components/view/ResourceLinks';
 import Description from '../components/view/Description';
 
-import { getItem, ModpackDef } from '../lib/db';
+import { Database, ModpackDef } from '../lib/db';
 
 import InstallIcon from '@mui/icons-material/InstallDesktop';
 
 export default function ModpackView() {
     const { uuid } = useParams();
-    const { data, error, isLoading } = useQuery<ModpackDef,Error>(["ViewModpack",uuid],()=>getItem("modpacks", uuid as string) as Promise<ModpackDef>, { enabled: !!uuid });
+    const { data, error, isLoading } = useQuery<ModpackDef,Error>(["ViewModpack",uuid],()=>Database.getItem<ModpackDef>(uuid,"modpacks"), { enabled: !!uuid });
 
     if(error) return (<ErrorMessage message={error.message}/>);
     if(isLoading) return (<Loader/>);

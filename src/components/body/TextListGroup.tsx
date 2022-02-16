@@ -1,7 +1,7 @@
 import { List, ListItemButton, ListItemText, Collapse, ListItemAvatar, Avatar } from '@mui/material';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
-import AppIcon from "@mui/icons-material/Apps";
+import FeedIcon from '@mui/icons-material/Feed';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -14,7 +14,7 @@ export function TextListItem({ name, icon, uuid }: { name: string, icon: string,
         }} sx={{ pl: 2, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", ":hover": { overflow: "visible" } }}>
             <ListItemAvatar sx={{ minWidth: "30px" }}>
                <Avatar variant='square' sx={{ width: 24, height: 24 }} src={icon}>
-                    <AppIcon sx={{ color: "#FFFFFF" }}/>
+                    <FeedIcon htmlColor='white' fontSize="small"/>
                </Avatar>
             </ListItemAvatar>
             <ListItemText primary={name}/>

@@ -6,7 +6,7 @@ use std::path::PathBuf;
 pub mod client {
     use super::*;
 
-    #[derive(Debug, Clone, Deserialize)]
+    #[derive(Debug, Clone, Deserialize, Serialize)]
     pub enum Loader {
         #[serde(rename="fabric")]
         Fabric,
@@ -16,6 +16,16 @@ pub mod client {
         Vanilla,
         #[serde(rename="optifine")]
         Optifine
+    }
+    impl Loader {
+        pub fn to_string(&self) -> String {
+            match self {
+                Loader::Fabric => "fabric".to_string(),
+                Loader::Forge => "forge".to_string(),
+                Loader::Optifine => "optifine".to_string(),
+                Loader::Vanilla => "vanilla".to_string()
+            }
+        }
     }
     impl Default for Loader {
         fn default() -> Self { Loader::Vanilla }

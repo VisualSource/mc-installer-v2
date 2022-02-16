@@ -1,6 +1,8 @@
-import { Paper, IconButton, Box, Button } from '@mui/material';
+import { Paper, IconButton, Box, Button, Skeleton } from '@mui/material';
+import { Suspense } from 'react';
 import { useNavigate, } from 'react-router-dom';
 import { appWindow } from '@tauri-apps/api/window';
+
 import CloseIcon from '@mui/icons-material/Close';
 import MinimizeIcon from '@mui/icons-material/Minimize';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
@@ -10,6 +12,7 @@ import ArrowRight from '@mui/icons-material/ArrowForward';
 
 import { useEffect, useState } from 'react';
 import Account from './Account';
+import FileBtn from './FileBtn';
 
 function FullscreenButton(){
     const [fullscreen, setFullscreen] = useState<boolean>(false);
@@ -26,6 +29,16 @@ function FullscreenButton(){
     );
 }
 
+function AccountFallback(){
+    return (
+        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+            <Box sx={{ height: "75%", display: "flex", justifyContent: "center", alignContent: "center" }}>
+                <Skeleton animation="wave" width={170} height={34} variant="rectangular"/>
+            </Box>
+        </Box>
+    );
+}
+
 
 export default function Header() {
     const navigate = useNavigate();
@@ -33,9 +46,11 @@ export default function Header() {
     return (
         <Paper id="vs-header-toolbar" elevation={4} component="header" data-tauri-drag-region>
             <Box data-tauri-drag-region id="vs-control-header">
-                <Button className='btn-square' size="small">File</Button>
+                <FileBtn/> 
                 <Box data-tauri-drag-region sx={{ display: "flex" }}>
-                    <Account/>
+                    <Suspense fallback={<AccountFallback/>}>
+                        <Account/>
+                    </Suspense>
                     <IconButton size='small' className='btn-square' onClick={()=>appWindow.minimize()}>
                         <MinimizeIcon/>
                     </IconButton>

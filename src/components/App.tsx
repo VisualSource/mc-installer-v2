@@ -1,9 +1,9 @@
 import { Routes, Route } from 'react-router-dom';
 import { Paper } from "@mui/material";
-import Header from './Header';
-import Footer from './Footer';
-import ListContainer from './ListContainer';
-import { ListGroup } from './ListGroup';
+import Header from './header/Header';
+import Footer from './footer/Footer';
+import ListContainer from './body/ListContainer';
+import { ListGroup } from './body/ListGroup';
 import Downloads from '../pages/Downloads';
 import Home from '../pages/Home';
 

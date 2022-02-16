@@ -8,7 +8,7 @@ import ErrorMessage from '../components/ErrorMessage';
 import Banner from '../components/view/Banner';
 import ModList from '../components/view/ModList';
 import ResourceLinks from '../components/view/ResourceLinks';
-import { getItem, MinecraftProfile } from '../lib/db';
+import { Database, MinecraftProfile } from '../lib/db';
 
 import { default_profile } from '../lib/profile';
 import { settings_profile } from '../models/ProfileSettingsDialog';
@@ -19,7 +19,7 @@ import StarIcon from '@mui/icons-material/Star';
 
 export default function ProfileView() {
     const { uuid } = useParams();
-    const { data, error, isLoading } = useQuery<MinecraftProfile,Error>(["ViewProfile",uuid],()=>getItem("profiles", uuid as string) as Promise<MinecraftProfile>, { enabled: !!uuid });
+    const { data, error, isLoading } = useQuery<MinecraftProfile,Error>(["ViewProfile",uuid],()=>Database.getItem(uuid), { enabled: !!uuid });
     const [ defaultProfile, setDefaultProfile] = useRecoilState(default_profile);
     const setEditProfile = useSetRecoilState(settings_profile);
 
@@ -42,7 +42,7 @@ export default function ProfileView() {
                         </IconButton>
                     </Tooltip>
                     <Tooltip title="Set as default">
-                        <IconButton sx={{ color: defaultProfile.uuid === data?.uuid ? "#eadf12" : "#FFFFFF" }} className="btn-square" onClick={()=>setDefaultProfile({ name: data?.name, uuid: data?.uuid })}>
+                        <IconButton sx={{ color: defaultProfile.uuid === data?.uuid ? "#eadf12" : "#FFFFFF" }} className="btn-square" onClick={defaultProfile.uuid === data?.uuid ? ()=>setDefaultProfile({ name: undefined, uuid: undefined }) : ()=>setDefaultProfile({ name: data?.name, uuid: data?.uuid })}>
                             <StarIcon/>
                         </IconButton>
                     </Tooltip>

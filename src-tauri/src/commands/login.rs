@@ -6,8 +6,9 @@ use crate::files::{
     }
 };
 use mc_laucher_lib_rs::login::{ get_auth_code,login_microsoft,ms_login_url };
-use tauri::{ WindowUrl, WindowBuilder, Runtime, Manager };
+use tauri::{ WindowUrl, WindowBuilder, Runtime, Manager, async_runtime };
 use log::{ error, warn };
+use std::thread;
 use std::path::PathBuf;
 
 fn create_window<R: Runtime>(app: tauri::AppHandle<R>,  title: String, label: String, url: String, ignore_url: String, done_script: String) -> Result<(),String>{
@@ -63,51 +64,59 @@ pub async fn login_error<R: Runtime>(window: tauri::Window<R>, err: String) -> R
 }
 
 #[tauri::command]
-pub fn login_done<R: Runtime>(window: tauri::Window<R>, url: String) -> Result<(),()> {
+pub async fn login_done<R: Runtime>(window: tauri::Window<R>, url: String) -> Result<(),()> {
+
+    let handle = thread::spawn(||{
+        let code = match get_auth_code(url) {
+            Some(value) => value,
+            None => return Err("Invaild auth code".to_string())
+        };
+
+        let account = match login_microsoft(CLIENT_ID.into(), REDIRECT_URI.into(), code) {
+            Ok(value) => value,
+            Err(err) => return Err(err.to_string())
+        };
+
+        if let Err(err) = update_user_cache(&account) {
+            return Err(err.to_string());
+        }
+
+        Ok(account)
+    });
+
+    match handle.join() {
+        Ok(value) => {
+            match value {
+                Ok(account) => {
+                    if let Err(error) = window.emit_to("main", "rustyminecraft://login_complete", account) {
+                        error!("{}",error);
+                        return Err(());
+                    }
+                }
+                Err(err) => {
+                    error!("{}",err);
+                    if let Err(error) = window.emit_to("main", "rustyminecraft://login_error",err) {
+                        error!("{}",error);
+                    }
+                }
+            }
+        }
+        Err(_err) => {
+            error!("Failed to rejoin a thread");
+            if let Err(error) = window.emit_to("main", "rustyminecraft://login_error","Failed to rejoin thread".to_string()) {
+                error!("{}",error);
+            }
+        }
+    }
+
     if window.label() == "ms-login" {
         if let Err(err) = window.close() {
             error!("{}",err);
         }
-
-        let code = match get_auth_code(url) {
-            Some(value) => value,
-            None => {
-                error!("Invaild auth code");
-                if let Err(error) = window.emit_to("main", "rustyminecraft://login_error","Invaild auth code".to_string()) {
-                    error!("{}",error);
-                }
-                return Err(());
-            }
-        };
-        let account = match login_microsoft(CLIENT_ID.into(), REDIRECT_URI.into(), code) {
-            Ok(value) => value,
-            Err(err) => {
-                error!("{}",err);
-                if let Err(error) = window.emit_to("main", "rustyminecraft://login_error",err.to_string()) {
-                    error!("{}",error);
-                }
-                return Err(());
-            }
-        };
-
-        if let Err(err) = update_user_cache(&account) {
-            error!("{}",err);
-            if let Err(error) = window.emit_to("main", "rustyminecraft://login_error",err.to_string()) {
-                error!("{}",error);
-            }
-            return Err(());
-        }
-
-        if let Err(error) = window.emit_to("main", "rustyminecraft://login_complete", account) {
-            error!("{}",error);
-            if let Err(error) = window.emit_to("main", "rustyminecraft://login_error","Invaild auth code".to_string()) {
-                error!("{}",error);
-            }
-            return Err(());
-        }
     } else {
-        warn!("Did not expect window ({}) to call this command",window.label());
+        warn!("Did not expect window ({}) to call this!",window.label());
     }
+
   Ok(())
 }
 

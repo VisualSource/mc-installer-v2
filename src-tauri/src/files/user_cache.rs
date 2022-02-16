@@ -1,5 +1,5 @@
 use crate::app::{ APP_INFO };
-use mc_laucher_lib_rs::Account;
+use mc_laucher_lib_rs::json::authentication_microsoft::Account;
 use std::collections::HashMap;
 use std::fs::{ File, read_to_string };
 use app_dirs2::{ get_app_dir, AppDataType };

@@ -4,7 +4,7 @@ import ArrowDown from "@mui/icons-material/ArrowDropDown";
 import Login from '@mui/icons-material/Login';
 import Logout from '@mui/icons-material/Logout';
 
-import { useAuth } from '../services/auth';
+import { useAuth } from '../../services/auth';
 
 export default function Account() {
     const { authenicated, user, login, logout } = useAuth();
@@ -23,6 +23,8 @@ export default function Account() {
                 anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
                 PaperProps={{
                     sx: {
+                        width: "200px", 
+                        maxWidth: '100%',
                         overflow: 'visible',
                         filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
                         '& .MuiAvatar-root': {
@@ -32,7 +34,7 @@ export default function Account() {
                             mr: 1,
                         },
                     }
-                }}>
+                }} elevation={2}>
                 <MenuItem>
                     <Avatar sx={{ color: "white" }}/> Profile
                 </MenuItem>

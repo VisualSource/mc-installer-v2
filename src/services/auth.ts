@@ -1,4 +1,4 @@
-import { atom, useRecoilState } from 'recoil';
+import { atom, useRecoilState, selector } from 'recoil';
 import { logout, login, user_cache, MicrosoftAccount } from '../lib/commands';
 
 interface Auth {
@@ -8,7 +8,7 @@ interface Auth {
     user: MicrosoftAccount | null
 }
 
-const user_auth = atom<Auth>({
+const currentUser = atom<Auth>({
     key: "account",
     default: {
         error: null,
@@ -18,23 +18,49 @@ const user_auth = atom<Auth>({
     }
 });
 
+const authenicatedAccount = selector<Auth>({
+    key: "authenicatedAcccout",
+    get: async ({ get }) => {
+        try {
+            const state = get(currentUser);
+            const user = localStorage.getItem("active_user");
+            if(user) {
+                const cache = await user_cache();
+                console.log(cache,user);
+                return {
+                    user: cache[user],
+                    error: null,
+                    isLoading: false,
+                    authenicated: true,
+                }
+            }
+            return state;
+        } catch (error: any) {
+            return {
+                authenicated: false,
+                isLoading: false,
+                user: null,
+                error: error
+            };
+        }
+    },
+    set: ({ set }, value) => {
+        set(currentUser,value);
+    }
+});
+
+
 export function useAuth(){
-    const [auth,setAuth] = useRecoilState(user_auth);
+    const [auth,setAuth] = useRecoilState(authenicatedAccount);
 
     const window_login =  async () => {
        try {
             setAuth({...auth, isLoading: true });
 
-            const cache = await user_cache();
-            const users = Object.values(cache);
+            const user = await login();
 
-            let user;
-            if(users.length === 1) {
-                user = users[0];
-            } else {
-                user = await login();
-            }
-
+            localStorage.setItem("active_user", user.xuid);
+            
             setAuth({ isLoading: false, authenicated: true, user, error: null });
        } catch (error: any) {
             setAuth({ isLoading: false, error: error, user: null, authenicated: false  });
@@ -43,6 +69,7 @@ export function useAuth(){
     const window_logout = async () => {
         try {
             setAuth({...auth, isLoading: true });
+            localStorage.removeItem("active_user");
             await logout(auth.user?.xuid);
             setAuth({ isLoading: false, authenicated: false, user: null, error: null });
         } catch (error: any) {
