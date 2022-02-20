@@ -4,6 +4,7 @@ use std::collections::HashMap;
 pub mod login;
 pub mod state;
 pub mod importer;
+pub mod play;
 
 const MINECRAFT_NEWS_URL: &str = "https://www.minecraft.net/content/minecraft-net/_jcr_content.articles.grid";
 

@@ -2,11 +2,16 @@ import { invoke } from '@tauri-apps/api';
 import { appWindow } from '@tauri-apps/api/window';
 import { nanoid } from 'nanoid';
 import { toast } from 'react-hot-toast';
-import type { MinecraftProfile, Loader } from './db';
+import { Database,  type MinecraftProfile, type Loader } from './db';
 
 export enum WindowEvents {
     LoginError = "rustyminecraft://login_error",
     LoginComplete = "rustyminecraft://login_complete"
+}
+export enum GameLaunchStatus {
+    Progress = "rustyminecraft://launch_status",
+    Error = "rustyminecraft://launch_error",
+    Ok = "rustyminecraft://launch_ok"
 }
 
 export interface MicrosoftAccount {
@@ -29,6 +34,7 @@ export interface MicrosoftAccount {
         }[]
     }
     xuid: string;
+    refresh_token: string;
 }
 
 export interface UserCache {
@@ -45,10 +51,7 @@ export async function login(): Promise<MicrosoftAccount> {
         });
         unlisenLogin = await appWindow.once<MicrosoftAccount>(WindowEvents.LoginComplete, async (account)=>{
             unlisenError();
-            ok({
-                xuid: account.payload.xuid,
-                profile: account.payload.profile
-            });
+            ok(account.payload);
         });
         invoke<void>("login");
     });
@@ -74,6 +77,10 @@ export async function can_run_setup(): Promise<boolean> {
 
 export async function setup_complete(): Promise<void> {
     return invoke<void>("setup_complete");
+}
+
+export async function is_game_running(): Promise<boolean> {
+    return invoke<boolean>("is_game_running");
 }
 
 interface RustyProfile {
@@ -133,4 +140,23 @@ export async function import_profiles(): Promise<MinecraftProfile[]> {
     }
    
     return data;
+}
+
+export async function run_game(xuid: string, profile_uuid: string) {
+    if(!xuid || !profile_uuid) throw new Error("Invaild xuid or profile uuid");
+    const profile = await Database.getItem(profile_uuid,"profiles");
+    const users = await user_cache();
+    const player = users[xuid];
+
+    await invoke("run_game", { settings: {
+        game_dir: profile.dot_minecraft,
+        java_dir: profile.java,
+        jvm_args: profile.jvm_args,
+        refresh_token: player.refresh_token,
+        minecraft: profile.minecraft,
+        loader: profile.loader,
+        loader_version: profile.loader_version
+    } });
+
+    await Database.profileEdit({ uuid: profile.uuid, data: { last_used: new Date().toUTCString() } }, "update");
 }

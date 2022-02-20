@@ -1,6 +1,7 @@
 import { useQuery } from 'react-query';
 import { useParams } from 'react-router-dom';
 import { useRecoilState, useSetRecoilState } from 'recoil';
+import { Suspense } from 'react';
 
 import { Box, Paper, Button, Container, Typography, IconButton, List, ListItem, ListItemText, Tooltip } from '@mui/material';
 import Loader from '../components/Loader';
@@ -8,14 +9,13 @@ import ErrorMessage from '../components/ErrorMessage';
 import Banner from '../components/view/Banner';
 import ModList from '../components/view/ModList';
 import ResourceLinks from '../components/view/ResourceLinks';
+import ProfileRunBtn from '../components/view/ProfileRunBtn';
 import { Database, MinecraftProfile } from '../lib/db';
 
 import { default_profile } from '../lib/profile';
 import { settings_profile } from '../models/ProfileSettingsDialog';
-import StartIcon from '@mui/icons-material/PlayArrow';
 import SettingsIcon from '@mui/icons-material/Settings';
 import StarIcon from '@mui/icons-material/Star';
-
 
 export default function ProfileView() {
     const { uuid } = useParams();
@@ -31,7 +31,9 @@ export default function ProfileView() {
             <Banner name={data?.name} media={data?.media} />
             <Container>
                 <Box sx={{ display: "flex", padding: "15px", alignItems: "center" }}>
-                    <Button sx={{ color: "#FFFFFF" }} size="medium" variant='contained' color="success" startIcon={<StartIcon/>}>Play</Button>
+                    <Suspense fallback={<Button sx={{ color: "#FFFFFF" }} size="medium" variant='contained' color="success">Loading</Button>}>
+                        <ProfileRunBtn uuid={data?.uuid}/>
+                    </Suspense>
                     <Box sx={{ marginLeft: "10px" }}>
                         <Typography variant='h6'>Last Played</Typography>
                         <Typography variant="subtitle2" color="lightgrey">{ data?.last_used ?? "Never played"}</Typography>

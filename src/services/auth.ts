@@ -26,7 +26,6 @@ const authenicatedAccount = selector<Auth>({
             const user = localStorage.getItem("active_user");
             if(user) {
                 const cache = await user_cache();
-                console.log(cache,user);
                 return {
                     user: cache[user],
                     error: null,

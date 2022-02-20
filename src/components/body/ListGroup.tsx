@@ -8,6 +8,8 @@ import { CardMedia, Grid , Card, CardActionArea, Container, Typography, Button }
 import { fetchList } from '../../lib/db';
 import { create_profile } from '../../models/CreateProfileDialog';
 
+import PackImage from '../../images/pack.webp';
+
 import AddIcon from '@mui/icons-material/Add';
 
 export function ListGroup() {
@@ -35,7 +37,7 @@ export function ListGroup() {
                     <Grid item key={i} id="vs-image-list-grid">
                         <Card className="vs-image-item" sx={{ width: "150px", height: "150px" }}>
                             <CardActionArea onClick={()=>navigate(`/view/${params.type}/${value.uuid}`)}>
-                                <CardMedia component="img" image={value.media?.card ?? `https://via.placeholder.com/600/${value.name}`} />
+                                <CardMedia component="img" image={value.media?.card ?? PackImage} />
                             </CardActionArea>
                         </Card>
                     </Grid>

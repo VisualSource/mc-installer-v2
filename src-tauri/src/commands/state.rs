@@ -6,7 +6,12 @@ use crate::app::{APP_INFO};
 
 #[derive(Default)]
 pub struct AppState {
-  s: std::sync::Mutex<Client>,
+  pub s: std::sync::Mutex<Client>,
+}
+impl AppState {
+  pub fn set_handle(&mut self, client: Client) {
+    self.s = std::sync::Mutex::new(client);
+  }
 }
 
 #[tauri::command]

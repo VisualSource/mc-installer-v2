@@ -11,7 +11,7 @@ use crate::json::{
     }
 };
 use serde_json::json;
-
+use log::debug;
 
 
 const MS_TOKEN_AUTHORIZATION_URL: &str = "https://login.live.com/oauth20_token.srf";
@@ -42,7 +42,7 @@ pub fn get_auth_code(url: String) -> Option<String> {
     }
 }
 
-fn refresh_auth_token(client_id: String, redirect_uri: String, auth_code: String) -> LibResult<AuthoriztionJson> {
+fn refresh_auth_token(client_id: String, redirect_uri: String, refresh_token: String) -> LibResult<AuthoriztionJson> {
     let client = match get_http_client() {
         Ok(value) => value,
         Err(err) => return Err(err)
@@ -50,12 +50,14 @@ fn refresh_auth_token(client_id: String, redirect_uri: String, auth_code: String
 
     let params = std::collections::HashMap::from([
         ("client_id", client_id.as_str()),
-        ("redirect_uri",redirect_uri.as_str()),
-        ("code",auth_code.as_str()),
-        ("grant_type","refresh_token")
+        ("refresh_token",refresh_token.as_str()),
+        ("grant_type","refresh_token"),
+        ("redirect_uri",redirect_uri.as_str())
     ]);
 
-    match client.post(MS_TOKEN_AUTHORIZATION_URL).json(&params).send() {
+    debug!("{:#?}",params);
+
+    match client.post(MS_TOKEN_AUTHORIZATION_URL).form(&params).send() {
         Ok(value) => {
             match value.json::<AuthoriztionJson>() {
                 Ok(value) => Ok(value),
@@ -84,7 +86,6 @@ fn get_authorization_token(client_id: String, redirect_uri: String, auth_code: S
 
     match client.post(MS_TOKEN_AUTHORIZATION_URL).form(&params).send() {
         Ok(value) => {
-            println!("{:#?}",value);
             match value.json::<AuthoriztionJson>() {
                 Ok(value) => Ok(value),
                 Err(err) => Err(LauncherLibError::PraseJsonReqwest(err))

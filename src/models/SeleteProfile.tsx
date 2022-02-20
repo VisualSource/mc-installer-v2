@@ -29,7 +29,7 @@ export default function SelectProfile(){
                 {
                     isLoading ? <Loader/> : error ? <ErrorMessage message="Failed to load profiles"/> : (
                     data?.map((profile,i)=>(
-                        <ListItem autoFocus button onClick={()=>{onClose();}}>
+                        <ListItem key={i} autoFocus button onClick={()=>{onClose();}}>
                             <ListItemAvatar>
                                 <Avatar src={profile?.media.icon ?? undefined}>
                                     <FeedIcon htmlColor='white' fontSize="small"/>

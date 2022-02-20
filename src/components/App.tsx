@@ -12,6 +12,7 @@ import ModView from '../pages/ModView';
 import ProfileView from '../pages/ProfileView';
 
 import Modals from '../models';
+import Settings from '../pages/Settings';
 
 export default function App() {
     return (
@@ -25,6 +26,7 @@ export default function App() {
                         <Route path=":type" element={<ListGroup/>}/>
                     </Route>
                     <Route path="downloads" element={<Downloads/>}/>
+                    <Route path="settings" element={<Settings/>}/>
                     <Route path="view">
                         <Route path="mods/:uuid" element={<ModView/>}/>
                         <Route path="modpacks/:uuid" element={<ModpackView/>}/>

@@ -11,6 +11,9 @@ use log::{ info };
 use commands::{
   get_user_cache,
   get_minecraft_news,
+  play:: {
+    run_game
+  },
   importer::{
     import_profiles
   },
@@ -46,7 +49,8 @@ fn main() {
     get_user_cache,
     can_run_setup,
     setup_complete,
-    import_profiles
+    import_profiles,
+    run_game
   ])
   .run(tauri::generate_context!())
   .expect("error while running tauri application");

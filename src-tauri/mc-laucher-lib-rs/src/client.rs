@@ -134,11 +134,17 @@ impl ClientBuilder {
             Ok(value) => ClientBuilder::install(value, minecraft_directory, callback, temp_path, cache_path, java)
         }
     }
-    pub fn new() -> LibResult<Self> {
-        let mc_dir = match get_minecraft_directory() {
-            Ok(value) => value,
-            Err(err) => return Err(err)
+    pub fn new(minecraft_dir: Option<PathBuf>) -> LibResult<Self> {
+        let mc_dir = match minecraft_dir {
+            Some(value) => value,
+            None => {
+                match get_minecraft_directory() {
+                    Ok(value) => value,
+                    Err(err) => return Err(err)
+                }
+            }
         };
+
         Ok(Self {
             minecraft_directory: mc_dir,
             ..Default::default()
@@ -148,8 +154,10 @@ impl ClientBuilder {
         self.options.jvm_arguments = Some(args);
         self
     }
-    pub fn set_java(&mut self, java: PathBuf) -> &mut Self {
-        self.options.executable_path = Some(java);
+    pub fn set_java(&mut self, java: Option<PathBuf>) -> &mut Self {
+        if let Some(path) = java {
+            self.options.executable_path = Some(path);
+        }
         self
     }
     pub fn as_dev_user(&mut self) -> &mut Self {
@@ -179,7 +187,7 @@ impl ClientBuilder {
         self.options.client_id = Some(id);
         self
     }
-    pub fn set_logging(&mut self) -> &mut Self {
+    pub fn enable_logging(&mut self) -> &mut Self {
 
         self.options.enable_logging_config = true;
         
@@ -188,20 +196,27 @@ impl ClientBuilder {
     pub fn set_minecraft(&mut self, minecraft: String, loader: Option<Loader>, loader_version: Option<String>) -> LibResult<&mut Self> {
         match loader {
             Some(value) => {
-                let lv = match loader_version {
-                    Some(value) => value,
-                    None => return Err(LauncherLibError::General("Missing loader version".into()))
-                };
-
                 match value {
                     Loader::Fabric => {
-                        self.minecraft = format!("fabric-loader-{loader}-{mc}", loader=lv,mc=minecraft).to_string();
+                        if let Some(lv) = loader_version {
+                            self.minecraft = format!("fabric-loader-{loader}-{mc}", loader=lv,mc=minecraft).to_string();
+                        } else {
+                            return Err(LauncherLibError::General("Missing loader version".into()))
+                        }
                     },
                     Loader::Forge => {
-                        self.minecraft = format!("{mc}-forge-{loader}", loader=lv,mc=minecraft).to_string();
+                        if let Some(lv) = loader_version {
+                            self.minecraft = format!("{mc}-forge-{loader}", loader=lv,mc=minecraft).to_string();
+                        } else {
+                            return Err(LauncherLibError::General("Missing loader version".into()))
+                        }
                     },
                     Loader::Optifine => {
-                        self.minecraft = format!("{mc}-OptiFine_{loader}", loader=lv,mc=minecraft).to_string();
+                        if let Some(lv) = loader_version {
+                            self.minecraft = format!("{mc}-OptiFine_{loader}", loader=lv,mc=minecraft).to_string();
+                        } else {
+                            return Err(LauncherLibError::General("Missing loader version".into()))
+                        }
                     }
                    _ => {
                         self.minecraft = minecraft;
@@ -314,7 +329,7 @@ mod tests {
             }
         };
 
-        match ClientBuilder::new() {
+        match ClientBuilder::new(None) {
             Ok(mut client) => {
                 let mut runner = match client
                 .set_client_id(client_id)
