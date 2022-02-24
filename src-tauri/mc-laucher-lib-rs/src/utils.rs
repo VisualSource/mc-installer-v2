@@ -7,26 +7,18 @@ use crate::json::{
         DownloadState,
         Event
     },
-    launcher_version::{
-        VersionsManifestLatest, 
-        VersionsManifestVersion, 
-        VersionsManifest
-    },
     game_settings::GameOptions
 };
-use std::io::{ Cursor, copy };
+use tokio::io::{ copy };
+use tokio::fs::{ read_to_string, create_dir_all, read, remove_file, File };
+use std::io::{ Cursor };
 use std::env::{ consts, var };
 use std::path::PathBuf;
-use std::fs::{ read_to_string, create_dir_all, read, remove_file, File };
 use crypto::{ sha1::Sha1, digest::Digest };
 use log::{ error };
 
-
-const MINECRAFT_MANIFEST: &str = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
-
-
-pub fn read_manifest(path: PathBuf) -> LibResult<VersionManifest> {
-    match read_to_string(path) {
+pub async fn read_manifest(path: PathBuf) -> LibResult<VersionManifest> {
+    match read_to_string(path).await {
         Ok(raw) => {
             match serde_json::from_str::<VersionManifest>(&raw) {
                 Ok(value) => Ok(value),
@@ -41,8 +33,8 @@ pub fn read_manifest(path: PathBuf) -> LibResult<VersionManifest> {
 }
 
 /// creates the http client with the set user_agent
-pub fn get_http_client() -> LibResult<reqwest::blocking::Client> {
-    let client = reqwest::blocking::ClientBuilder::new();
+pub async fn get_http_client() -> LibResult<reqwest::Client> {
+    let client = reqwest::ClientBuilder::new();
     match client.user_agent(format!("rustymodclient/{}",env!("CARGO_PKG_VERSION"))).build() {
         Ok(value) => Ok(value),
         Err(err) => Err(LauncherLibError::HTTP {
@@ -51,6 +43,8 @@ pub fn get_http_client() -> LibResult<reqwest::blocking::Client> {
         })
     }
 }
+
+
 
 /// Returns the default path to the .minecraft directory
 pub fn get_minecraft_directory() -> LibResult<PathBuf> {
@@ -70,53 +64,7 @@ pub fn get_minecraft_directory() -> LibResult<PathBuf> {
     }
 }
 
-/// Returns the latest version of Minecraft
-pub fn get_latest_offical_version() -> LibResult<VersionsManifestLatest> {
-    let client = match get_http_client() {
-        Ok(value) => value,
-        Err(err) => return Err(err)
-    };
-
-    match client.get(MINECRAFT_MANIFEST).send() {
-        Ok(value) => {
-            match value.json::<VersionsManifest>() {
-                Ok(request) => {
-                    Ok(request.latest)
-                }
-                Err(err) => Err(LauncherLibError::PraseJsonReqwest(err))   
-            }
-        }
-        Err(err) => Err(LauncherLibError::HTTP {
-            source: err,
-            msg: "Failed to fetch Minecraft latest version".into()
-        })
-    }
-}
-
-/// Returns all versions that Mojang offers to download
-pub fn get_offical_version_list() -> LibResult<Vec<VersionsManifestVersion>> {
-    let client = match get_http_client() {
-        Ok(value) => value,
-        Err(err) => return Err(err)
-    };
-
-    match client.get(MINECRAFT_MANIFEST).send() {
-        Ok(value) => {
-            match value.json::<VersionsManifest>() {
-                Ok(request) => {
-                    Ok(request.versions)
-                }
-                Err(err) => Err(LauncherLibError::PraseJsonReqwest(err))       
-            }
-        }
-        Err(err) => Err(LauncherLibError::HTTP {
-            source: err,
-             msg: "Failed to fetch Minecraft latest version".into()
-        })
-    }
-}
-
-pub fn get_local_installed_versions(mc_dir: PathBuf) -> LibResult<Vec<VersionManifest>> {
+pub async fn get_local_installed_versions(mc_dir: PathBuf) -> LibResult<Vec<VersionManifest>> {
 
     let versions = mc_dir.join("versions");
 
@@ -130,7 +78,7 @@ pub fn get_local_installed_versions(mc_dir: PathBuf) -> LibResult<Vec<VersionMan
                             let base = json_file.as_os_str().to_str().unwrap();
                             let path = value.path().join(format!("{}.json",base));
                             if !path.is_file() { continue; }
-                            match read_to_string(path) {
+                            match read_to_string(path).await {
                                 Ok(raw_json) => {
                                     match serde_json::from_str::<VersionManifest>(&raw_json) {
                                         Ok(json) => {
@@ -232,9 +180,9 @@ pub fn get_os_version() -> String {
 }
 
 /// generates the sha1 hash for a file
-pub fn get_sha1(path: PathBuf) -> LibResult<String> {
+pub async fn get_sha1(path: PathBuf) -> LibResult<String> {
     let mut hasher = Sha1::new();
-    match read(path) {
+    match read(path).await {
         Ok(raw) => {
             hasher.input(&raw);
             Ok(hasher.result_str())
@@ -246,13 +194,13 @@ pub fn get_sha1(path: PathBuf) -> LibResult<String> {
     }
 }
 
-pub fn download_file(url: String, output: PathBuf, callback: Callback, sha1: Option<String>, compressed: bool) -> LibResult<DownloadState> {
+pub async fn download_file(url: String, output: PathBuf, callback: Callback, sha1: Option<String>, compressed: bool) -> LibResult<DownloadState> {
     // check if the file directory exits
     if !output.exists() {
         let mut path = output.clone();
         path.pop();
         if !path.exists() {
-            if let Err(err) = create_dir_all(path) {
+            if let Err(err) = create_dir_all(path).await {
                return Err(LauncherLibError::OS {
                    source: err,
                    msg: "Failed to create directory".into()
@@ -263,22 +211,12 @@ pub fn download_file(url: String, output: PathBuf, callback: Callback, sha1: Opt
 
     // if exits/has sha1 check if vaild if not remove invaild file.
     if output.exists() && output.is_file() {
-        if let Some(sha) = sha1.clone() {
-            match get_sha1(output.clone()) {
-                Ok(value) => {
-                    if sha == value {
-                        callback(Event::download(DownloadState::Exists, url.clone()));
-                        return Ok(DownloadState::Exists);
-                    }
-                }
-                Err(error) => return Err(error)
-            };
-        } else {
+        if sha1.is_none() {
             callback(Event::download(DownloadState::ExistsUnchecked, url.clone()));
             return Ok(DownloadState::ExistsUnchecked);
         }
 
-        if let Err(error) = remove_file(output.clone()) {
+        if let Err(error) = remove_file(output.clone()).await {
             return Err(LauncherLibError::OS {
                 msg: "Failed to remove file".into(),
                 source: error
@@ -292,16 +230,16 @@ pub fn download_file(url: String, output: PathBuf, callback: Callback, sha1: Opt
         return Err(LauncherLibError::General("DOWNLOAD FILE | Invaild url".into()));
     }
 
-    let client = match get_http_client() {
+    let client = match get_http_client().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
 
-    match client.get(&url).send() {
+    match client.get(&url).send().await {
         Ok(response) => {
-            match response.bytes() {
+            match response.bytes().await {
                 Ok(value) => {
-                    let mut file = match File::create(output.clone()) {
+                    let mut file = match File::create(output.clone()).await {
                         Ok(value) => value,
                         Err(error) => return Err(LauncherLibError::OS{
                                 source: error,
@@ -309,17 +247,18 @@ pub fn download_file(url: String, output: PathBuf, callback: Callback, sha1: Opt
                         })
                     };
                     if compressed {
-
                         let mut buf = Cursor::new(value);
-                
-                        if let Err(error) = lzma_rs::lzma_decompress(&mut buf, &mut file) {
+
+                        let mut sync_file: std::fs::File = file.into_std().await;
+
+                        if let Err(error) = lzma_rs::lzma_decompress(&mut buf, &mut sync_file) {
                             callback(Event::Error("Failed to decompress file".into()));
                             return Err(LauncherLibError::General(error.to_string()));
                         }
                     } else {
 
                         let mut content = Cursor::new(value);
-                        if let Err(err) = copy(&mut content, &mut file) {
+                        if let Err(err) = copy(&mut content, &mut file).await {
                             return Err(LauncherLibError::OS{
                                 source: err,
                                 msg: "Failed to copy contents to file".into()
@@ -328,7 +267,7 @@ pub fn download_file(url: String, output: PathBuf, callback: Callback, sha1: Opt
                     }
 
                     if let Some(sha) = sha1 {
-                        match get_sha1(output.clone()) {
+                        match get_sha1(output.clone()).await {
                             Ok(value) => {
                                 if sha == value {
                                     callback(Event::download(DownloadState::DownloadChecked, url.clone()));
@@ -467,7 +406,7 @@ pub fn parse_rule_list(data: &Vec<Rule>, options: &GameOptions) -> bool {
 /// Implement the inheritsFrom function
 /// See <https://github.com/tomsik68/mclauncher-api/wiki/Version-Inheritance-&-Forge>
 /// This function my be unneed
-pub fn inherit_json(original_data: &VersionManifest, path: &PathBuf) -> LibResult<VersionManifest> {
+pub async fn inherit_json(original_data: &VersionManifest, path: &PathBuf) -> LibResult<VersionManifest> {
     let inherit_version = if let Some(value) = original_data.inherits_from.clone() { value } else {
         return Err(LauncherLibError::General("Expected inheritesFrom to be set".into()));
     };
@@ -493,7 +432,7 @@ pub fn inherit_json(original_data: &VersionManifest, path: &PathBuf) -> LibResul
     };
 
     let version_path = path.join("versions").join(inherit_version.clone()).join(format!("{}.json",inherit_version));
-    let inherit_data: VersionManifest = match read_manifest(version_path) {
+    let inherit_data: VersionManifest = match read_manifest(version_path).await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
@@ -522,11 +461,11 @@ pub fn inherit_json(original_data: &VersionManifest, path: &PathBuf) -> LibResul
 }
 
 
-pub fn read_manifest_inherit(version_json: PathBuf, mc_dir: &PathBuf) -> LibResult<VersionManifest>  {
-    match read_manifest(version_json) {
+pub async fn read_manifest_inherit(version_json: PathBuf, mc_dir: &PathBuf) -> LibResult<VersionManifest>  {
+    match read_manifest(version_json).await {
         Ok(value) => {
             if value.inherits_from.is_some() {
-                match inherit_json(&value, &mc_dir) {
+                match inherit_json(&value, &mc_dir).await {
                     Ok(inherited) => Ok(inherited),
                     Err(err) => return Err(err)
                 }
@@ -542,6 +481,57 @@ pub fn read_manifest_inherit(version_json: PathBuf, mc_dir: &PathBuf) -> LibResu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_download_file(){
+        let out = PathBuf::from("C:\\projects\\mc-installer-v2\\src-tauri\\mc-laucher-lib-rs\\tests");
+        let file_compressed: String = "https://launcher.mojang.com/v1/objects/962508e35b9c56e3c89ea4620672cecbeba47109/java".into();
+        let url_uncomcompressed: String = "https://launcher.mojang.com/v1/objects/1654ec74efdc41582e5f954c10681cbde5a22996/java".into();
+        let sha1_compressed: String = "962508e35b9c56e3c89ea4620672cecbeba47109".into();
+        let sha1_uncompressed: String = "1654ec74efdc41582e5f954c10681cbde5a22996".into();
+
+        // compressed
+        match download_file(file_compressed.clone(), out.join("java_c.exe"), |event| { println!("Compressed: {:#?}",event); }, None, true).await {
+            Ok(value) => {
+                println!("{:#?}",value);
+            }
+            Err(err) => {
+                eprintln!("{:#?}",err);
+            }
+        }
+
+        // compressed with sha1
+        match download_file(file_compressed, out.join("java_cs.exe"), |event| { println!("Compressed: {:#?}",event); }, Some(sha1_compressed), true).await {
+            Ok(value) => {
+                println!("{:#?}",value);
+            }
+            Err(err) => {
+                eprintln!("{:#?}",err);
+            }
+        }
+
+        // no compress
+        match download_file(url_uncomcompressed.clone(), out.join("java_u.exe"), |event| { println!("Compressed {:#?}",event); }, None, false).await {
+            Ok(value) => {
+                println!("{:#?}",value);
+            }
+            Err(err) => {
+                eprintln!("{:#?}",err);
+            }
+        }
+
+         // no compress with sha1
+         match download_file( url_uncomcompressed, out.join("java_us.exe"), |event| { println!("SHA1 {:#?}",event); },Some(sha1_uncompressed), false).await {
+            Ok(value) => {
+                println!("{:#?}",value);
+            }
+            Err(err) => {
+                eprintln!("{:#?}",err);
+            }
+        }
+    }
+
+
     #[test]
     fn test_get_java_executable() {
         match get_java_executable() {
@@ -553,34 +543,12 @@ mod tests {
             }
         }
     }
-    #[test]
-    fn test_get_local_installed_versions() {
+    #[tokio::test]
+    async fn test_get_local_installed_versions() {
         let path = get_minecraft_directory().unwrap();
-            match get_local_installed_versions(path) {
+            match get_local_installed_versions(path).await {
                 Ok(value) => {
                     println!("{:#?}",value[0]);
-                }
-                Err(err) => {
-                    eprintln!("{}",err);
-                }
-            }
-    }
-    #[test]
-    fn test_get_offical_version_list() {
-            match get_offical_version_list() {
-                Ok(value) => {
-                    println!("{:#?}",value);
-                }
-                Err(err) => {
-                    eprintln!("{}",err);
-                }
-            }
-    }
-    #[test]
-    fn test_get_latest_offical_version() {
-            match get_latest_offical_version() {
-                Ok(value) => {
-                    println!("{:#?}",value);
                 }
                 Err(err) => {
                     eprintln!("{}",err);

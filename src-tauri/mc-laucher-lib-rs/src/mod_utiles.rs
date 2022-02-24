@@ -25,15 +25,15 @@ pub struct MavenMetadata {
     pub versioning: MavenVersioning
 }
 
-pub fn get_metadata(root_url: &str) -> LibResult<MavenMetadata> {
-    let client = match get_http_client() {
+pub async fn get_metadata(root_url: &str) -> LibResult<MavenMetadata> {
+    let client = match get_http_client().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
 
-    match client.get(format!("{}maven-metadata.xml",root_url).as_str()).send() {
+    match client.get(format!("{}maven-metadata.xml",root_url).as_str()).send().await {
         Ok(response) => {
-            match response.text() {
+            match response.text().await {
                 Ok(value) => {
                     match serde_xml_rs::from_str::<MavenMetadata>(&value) {
                         Ok(res) => Ok(res),

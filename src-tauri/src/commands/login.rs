@@ -63,47 +63,38 @@ pub async fn login_error<R: Runtime>(window: tauri::Window<R>, err: String) -> R
   Ok(())
 }
 
+
+async fn login_core(url: String) -> Result<mc_laucher_lib_rs::json::authentication_microsoft::Account,String> {
+    let code = match get_auth_code(url) {
+        Some(value) => value,
+        None => return Err("Invaild auth code".to_string())
+    };
+
+    let account = match login_microsoft(CLIENT_ID.into(), REDIRECT_URI.into(), code).await {
+        Ok(value) => value,
+        Err(err) => return Err(err.to_string())
+    };
+
+    if let Err(err) = update_user_cache(&account) {
+        return Err(err.to_string());
+    }
+
+    Ok(account)
+}
+
 #[tauri::command]
 pub async fn login_done<R: Runtime>(window: tauri::Window<R>, url: String) -> Result<(),()> {
 
-    let handle = thread::spawn(||{
-        let code = match get_auth_code(url) {
-            Some(value) => value,
-            None => return Err("Invaild auth code".to_string())
-        };
-
-        let account = match login_microsoft(CLIENT_ID.into(), REDIRECT_URI.into(), code) {
-            Ok(value) => value,
-            Err(err) => return Err(err.to_string())
-        };
-
-        if let Err(err) = update_user_cache(&account) {
-            return Err(err.to_string());
-        }
-
-        Ok(account)
-    });
-
-    match handle.join() {
-        Ok(value) => {
-            match value {
-                Ok(account) => {
-                    if let Err(error) = window.emit_to("main", "rustyminecraft://login_complete", account) {
-                        error!("{}",error);
-                        return Err(());
-                    }
-                }
-                Err(err) => {
-                    error!("{}",err);
-                    if let Err(error) = window.emit_to("main", "rustyminecraft://login_error",err) {
-                        error!("{}",error);
-                    }
-                }
+    match login_core(url).await {
+        Ok(account) => {
+            if let Err(error) = window.emit_to("main", "rustyminecraft://login_complete", account) {
+                error!("{}",error);
+                return Err(());
             }
         }
-        Err(_err) => {
+        Err(err) => {
             error!("Failed to rejoin a thread");
-            if let Err(error) = window.emit_to("main", "rustyminecraft://login_error","Failed to rejoin thread".to_string()) {
+            if let Err(error) = window.emit_to("main", "rustyminecraft://login_error",err) {
                 error!("{}",error);
             }
         }

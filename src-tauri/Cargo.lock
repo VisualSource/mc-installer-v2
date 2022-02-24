@@ -1978,7 +1978,7 @@ checksum = "a3e378b66a060d48947b590737b30a1be76706c8dd7b8ba0f2fe3989c68a853f"
 
 [[package]]
 name = "mc-laucher-lib-rs"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64 0.13.0",
  "jsonwebtoken 8.0.1",
@@ -1993,6 +1993,7 @@ dependencies = [
  "serde-xml-rs",
  "serde_json",
  "thiserror",
+ "tokio",
  "urlparse",
  "uuid",
  "zip",
@@ -3445,6 +3446,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "signal-hook-registry"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e51e73328dc4ac0c7ccbda3a494dfa03df1de2f46018127f60c693f2648455b0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "simple_asn1"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4039,7 +4049,9 @@ dependencies = [
  "memchr",
  "mio",
  "num_cpus",
+ "once_cell",
  "pin-project-lite",
+ "signal-hook-registry",
  "tokio-macros",
  "winapi",
 ]

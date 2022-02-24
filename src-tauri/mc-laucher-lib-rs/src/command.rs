@@ -169,14 +169,14 @@ fn get_arguments(args: &Vec<Argument>, manifest: &VersionManifest, path: PathBuf
     args_list
 }
 
-pub fn get_launch_command(version: String, mc_dir: PathBuf, options: &mut GameOptions) -> LibResult<(String, Vec<String> )> {
+pub async fn get_launch_command(version: String, mc_dir: PathBuf, options: &mut GameOptions) -> LibResult<(String, Vec<String> )> {
     let version_path = mc_dir.join("versions").join(version.clone()).join(format!("{}.json",version));
 
     if !version_path.is_file() {
         return Err(LauncherLibError::NotFound(version));
     }
 
-    let manifest: VersionManifest = match read_manifest_inherit(version_path,&mc_dir) {
+    let manifest: VersionManifest = match read_manifest_inherit(version_path,&mc_dir).await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };

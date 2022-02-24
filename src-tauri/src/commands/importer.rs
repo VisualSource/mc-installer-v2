@@ -1,4 +1,8 @@
-use mc_laucher_lib_rs::{ get_minecraft_directory, json::client::Loader, get_latest_offical_version };
+use mc_laucher_lib_rs::{  
+    json::client::Loader, 
+    utils::get_minecraft_directory,
+    vanilla::get_latest_vanilla_version
+};
 use std::collections::HashMap;
 use serde::{ Deserialize, Serialize };
 use log::{ warn };
@@ -156,12 +160,12 @@ pub async fn import_profiles() -> Result<Vec<RustyProfile>, String> {
             } 
         } else {
             if value.last_version_id == "latest_release".to_string() {
-                match get_latest_offical_version() {
+                match get_latest_vanilla_version().await {
                     Ok(value)=> {
                         minecraft = value.release;
                     }
                     Err(err) =>{
-                        warn!("Failed import: {}",key);
+                        warn!("Failed import: {} {}",key,err);
                         failed_imports += 1;
                         continue;
                     }

@@ -160,3 +160,29 @@ export async function run_game(xuid: string, profile_uuid: string) {
 
     await Database.profileEdit({ uuid: profile.uuid, data: { last_used: new Date().toUTCString() } }, "update");
 }
+
+export interface MinecraftVersion {
+    minecraft: string;
+    loader: Loader,
+    loader_version: string | null
+}
+
+export async function get_minecraft_versions() {
+    return invoke<MinecraftVersion[]>("stable_vanilla_versions")
+}
+
+export async function get_loader_versions(type: Loader): Promise<{ [version: string]: string[] }> {
+    switch (type) {
+        case "fabric":
+            return invoke("stable_fabric_versions");
+        case "forge":
+            return invoke("stable_forge_versions");
+        case "optifine":
+            return invoke("stable_optifine_versions")
+        default:
+            return { vanilla: ["No Versions"] };
+    }
+}
+
+//@ts-ignore
+window.test = get_loader_versions;

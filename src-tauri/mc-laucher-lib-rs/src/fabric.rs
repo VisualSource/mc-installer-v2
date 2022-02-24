@@ -1,15 +1,17 @@
 use crate::expections::{ LauncherLibError,LibResult};
-use crate::utils::{get_http_client,  get_offical_version_list, download_file };
+use crate::utils::{get_http_client, download_file };
+use crate::vanilla::get_vanilla_versions;
 use crate::mod_utiles::get_metadata;
 use crate::runtime::get_exectable_path;
-use crate::vanilla::install_minecraft_version;
+use crate::install::install_minecraft_version;
 use crate::json::{
     runtime::MinecraftJavaRuntime,
     install::{ Callback, Event }
 };
 use std::path::PathBuf;
 use serde::{ Deserialize, Serialize };
-use std::process::{Command,Stdio};
+use tokio::process::{Command};
+use std::process::Stdio;
 
 const FABRIC_API_ROOT: &str = "https://meta.fabricmc.net/v2/versions/";
 const FABRIC_INSTALLER_MAVEN: &str = "https://maven.fabricmc.net/net/fabricmc/fabric-installer/";
@@ -25,15 +27,15 @@ struct FabricLoaderVersion {
     version: String,
 }
 
-pub fn get_supported_mc_versions() -> LibResult<Vec<FabricVersionItem>> {
-    let client = match get_http_client() {
+pub async fn get_supported_mc_versions() -> LibResult<Vec<FabricVersionItem>> {
+    let client = match get_http_client().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
 
-    match client.get(format!("{}game",FABRIC_API_ROOT).as_str()).send() {
+    match client.get(format!("{}game",FABRIC_API_ROOT).as_str()).send().await {
         Ok(value) => {
-            match value.json::<Vec<FabricVersionItem>>() {
+            match value.json::<Vec<FabricVersionItem>>().await {
                 Ok(versions) => Ok(versions),
                 Err(err) => Err(LauncherLibError::PraseJsonReqwest(err))
             }
@@ -45,8 +47,8 @@ pub fn get_supported_mc_versions() -> LibResult<Vec<FabricVersionItem>> {
     }
 }
 
-pub fn get_supported_stable_versions() -> LibResult<Vec<FabricVersionItem>> {
-    let versions = match get_supported_mc_versions() {
+pub async fn get_supported_stable_versions() -> LibResult<Vec<FabricVersionItem>> {
+    let versions = match get_supported_mc_versions().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
@@ -59,8 +61,8 @@ pub fn get_supported_stable_versions() -> LibResult<Vec<FabricVersionItem>> {
     Ok(stable)
 }
 
-pub fn get_latest_supported() -> LibResult<String> {
-    let mc = match get_supported_mc_versions() {
+pub async fn get_latest_supported() -> LibResult<String> {
+    let mc = match get_supported_mc_versions().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
@@ -70,8 +72,8 @@ pub fn get_latest_supported() -> LibResult<String> {
     }
 }
 
-pub fn is_supported(mc_version: String) -> LibResult<bool> {
-    let versions = match  get_supported_mc_versions() {
+pub async fn is_supported(mc_version: String) -> LibResult<bool> {
+    let versions = match get_supported_mc_versions().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
@@ -81,15 +83,15 @@ pub fn is_supported(mc_version: String) -> LibResult<bool> {
     Ok(is_vaild)
 }
 
-fn get_loader_versions() -> LibResult<Vec<FabricLoaderVersion>> {
-    let client = match get_http_client() {
+async fn get_loader_versions() -> LibResult<Vec<FabricLoaderVersion>> {
+    let client = match get_http_client().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
 
-    match client.get(format!("{}loader",FABRIC_API_ROOT).as_str()).send() {
+    match client.get(format!("{}loader",FABRIC_API_ROOT).as_str()).send().await {
         Ok(value) => {
-            match value.json::<Vec<FabricLoaderVersion>>(){
+            match value.json::<Vec<FabricLoaderVersion>>().await {
                 Ok(versions) => Ok(versions),
                 Err(err) => Err(LauncherLibError::PraseJsonReqwest(err))
             }
@@ -101,8 +103,8 @@ fn get_loader_versions() -> LibResult<Vec<FabricLoaderVersion>> {
     }
 }
 
-fn get_latest_loader_version() -> LibResult<String> {
-    let loaders = match get_loader_versions() {
+async fn get_latest_loader_version() -> LibResult<String> {
+    let loaders = match get_loader_versions().await {
       Ok(value) => value,
       Err(err) => return Err(err)  
     };
@@ -112,19 +114,19 @@ fn get_latest_loader_version() -> LibResult<String> {
     }
 }
 
-fn get_latest_installer() -> LibResult<String> {
-    match get_metadata(FABRIC_INSTALLER_MAVEN) {
+async fn get_latest_installer() -> LibResult<String> {
+    match get_metadata(FABRIC_INSTALLER_MAVEN).await {
         Ok(value) => Ok(value.versioning.release.clone()),
         Err(err) => return Err(err)
     }
 }
 
-pub fn install_fabric(mc: String, mc_dir: PathBuf, loader: Option<String>, callback: Callback, java: Option<PathBuf>, temp_path: PathBuf) -> LibResult<()> {
+pub async fn install_fabric(mc: String, mc_dir: PathBuf, loader: Option<String>, callback: Callback, java: Option<PathBuf>, temp_path: PathBuf) -> LibResult<()> {
 
     let mc_path = mc_dir.join("versions").join(mc.clone()).join(format!("{}.json",mc));
 
     // check if given mc version is a offical version.
-    match get_offical_version_list() {
+    match get_vanilla_versions().await {
         Ok(version) => {
             if !version.iter().any(|e| e.id == mc) {
                 return Err(LauncherLibError::NotFound(mc))
@@ -134,7 +136,7 @@ pub fn install_fabric(mc: String, mc_dir: PathBuf, loader: Option<String>, callb
     }
 
     // check if given minecraft version is supported by fabric
-    match is_supported(mc.clone()) {
+    match is_supported(mc.clone()).await {
         Err(err) => return Err(err),
         Ok(value) => {
             if !value {
@@ -146,7 +148,7 @@ pub fn install_fabric(mc: String, mc_dir: PathBuf, loader: Option<String>, callb
     let loaderv = match loader {
         Some(value) => value,
         None => {
-            match get_latest_loader_version() {
+            match get_latest_loader_version().await {
                 Ok(value) => value,
                 Err(err) => return Err(err)
             }
@@ -154,7 +156,7 @@ pub fn install_fabric(mc: String, mc_dir: PathBuf, loader: Option<String>, callb
     };
 
     if !mc_path.is_file() {
-        if let Err(err) = install_minecraft_version(mc.clone(), mc_dir.clone(), callback) {
+        if let Err(err) = install_minecraft_version(mc.clone(), mc_dir.clone(), callback).await {
             return Err(err);
         }
     }
@@ -167,7 +169,7 @@ pub fn install_fabric(mc: String, mc_dir: PathBuf, loader: Option<String>, callb
         return Ok(());
     }
 
-    let installer_version = match get_latest_installer() {
+    let installer_version = match get_latest_installer().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
@@ -180,7 +182,7 @@ pub fn install_fabric(mc: String, mc_dir: PathBuf, loader: Option<String>, callb
     let installer_file = temp_path.join("fabric-install.js");
 
     callback(Event::progress(0, 1));
-    if let Err(err) = download_file(installer_url, installer_file.clone(), callback, None, false) {
+    if let Err(err) = download_file(installer_url, installer_file.clone(), callback, None, false).await {
         return Err(err);
     }
     callback(Event::progress(1, 1));
@@ -213,7 +215,7 @@ pub fn install_fabric(mc: String, mc_dir: PathBuf, loader: Option<String>, callb
         "-noprofile"
     ];
 
-    match Command::new(exec).args(args).stdout(Stdio::inherit()).output() {
+    match Command::new(exec).args(args).stdout(Stdio::inherit()).output().await {
         Ok(value) => {
             callback(Event::Status(String::from_utf8_lossy(&value.stderr).to_string()));
             callback(Event::Status(String::from_utf8_lossy(&value.stdout).to_string()));
@@ -233,24 +235,24 @@ pub fn install_fabric(mc: String, mc_dir: PathBuf, loader: Option<String>, callb
         })
     };
 
-    install_minecraft_version(fabric_mc, mc_dir, callback)
+    install_minecraft_version(fabric_mc, mc_dir, callback).await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_get_loader_versions() {
-        match get_loader_versions() {
+    #[tokio::test]
+    async fn test_get_loader_versions() {
+        match get_loader_versions().await {
             Ok(value) => println!("{:#?}",value),
             Err(err) => eprintln!("{}",err)
         }
     }
 
-    #[test]
-    fn test_get_supported_mc_versions() {
-        match get_supported_mc_versions() {
+    #[tokio::test]
+    async fn test_get_supported_mc_versions() {
+        match get_supported_mc_versions().await {
             Ok(value) => println!("{:#?}",value),
             Err(err) => eprintln!("{}",err)
         }

@@ -10,7 +10,7 @@ use crate::json::{
 };
 use crate::expections::{ LibResult, LauncherLibError};
 use crate::utils::{ get_http_client, download_file };
-use std::fs::{ write, create_dir_all };
+use tokio::fs::{ write, create_dir_all };
 use std::env::{ consts };
 use std::path::PathBuf;
 
@@ -39,15 +39,15 @@ fn get_jvm_platform_string() -> LibResult<String> {
 }
 
 /// returns a list of all mc jvm runtimes
-fn get_jvm_runtimes() -> LibResult<JvmManifest> {
-    let client = match get_http_client() {
+async fn get_jvm_runtimes() -> LibResult<JvmManifest> {
+    let client = match get_http_client().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
 
-    match client.get(JVM_MANIFEST_URL).send() {
+    match client.get(JVM_MANIFEST_URL).send().await {
         Ok(res) => {
-            match res.json::<JvmManifest>(){
+            match res.json::<JvmManifest>().await {
                 Err(error) => Err(LauncherLibError::PraseJsonReqwest(error)),
                 Ok(value) => Ok(value)
             }
@@ -78,8 +78,8 @@ fn get_manifest(arch: String, runtime: MinecraftJavaRuntime, runtimes: JvmManife
     }
 }
 
-pub fn install_jvm_runtime(jvm_version: MinecraftJavaRuntime, minecraft_dir: PathBuf, callback: Callback) -> LibResult<()> {
-    let runtimes = match get_jvm_runtimes() {
+pub async fn install_jvm_runtime(jvm_version: MinecraftJavaRuntime, minecraft_dir: PathBuf, callback: Callback) -> LibResult<()> {
+    let runtimes = match get_jvm_runtimes().await {
         Err(err) => return Err(err),
         Ok(value) => value
     };
@@ -93,14 +93,14 @@ pub fn install_jvm_runtime(jvm_version: MinecraftJavaRuntime, minecraft_dir: Pat
         Err(err) => return Err(err)
     };
 
-    let client = match get_http_client() {
+    let client = match get_http_client().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
 
-    let src_download = match client.get(manifest.manifest.url.as_str()).send() {
+    let src_download = match client.get(manifest.manifest.url.as_str()).send().await {
         Ok(value) => {
-            match value.json::<JVMFiles>() {
+            match value.json::<JVMFiles>().await {
                 Ok(json) => json,
                 Err(err) => return Err(LauncherLibError::PraseJsonReqwest(err))
             }
@@ -123,11 +123,11 @@ pub fn install_jvm_runtime(jvm_version: MinecraftJavaRuntime, minecraft_dir: Pat
             "file" => {
                 if let Some(download) = &value.downloads {
                     if let Some(lzma) = download.lzma.clone() {
-                        if let Err(error) = download_file(lzma.url, cur.clone(), callback, Some(lzma.sha1), true){
+                        if let Err(error) = download_file(lzma.url, cur.clone(), callback, Some(lzma.sha1), true).await {
                              return Err(error);
                         }
                     } else {
-                        if let Err(error) = download_file(download.raw.url.clone(), cur.clone(), callback, Some(download.raw.sha1.clone()), false){
+                        if let Err(error) = download_file(download.raw.url.clone(), cur.clone(), callback, Some(download.raw.sha1.clone()), false).await {
                             return Err(error);
                         }
                     }
@@ -137,7 +137,7 @@ pub fn install_jvm_runtime(jvm_version: MinecraftJavaRuntime, minecraft_dir: Pat
             }
             "directory" => {
                 if !cur.exists() {
-                    if let Err(error) = create_dir_all(cur) {
+                    if let Err(error) = create_dir_all(cur).await {
                         return Err(LauncherLibError::OS {
                             source: error,
                             msg: "Failed to create directory".into()
@@ -158,11 +158,11 @@ pub fn install_jvm_runtime(jvm_version: MinecraftJavaRuntime, minecraft_dir: Pat
                 println!("Redownloading \033[48;5;57m {}",key);
                 if let Some(download) = &value.downloads {
                     if let Some(lzma) = download.lzma.clone() {
-                        if let Err(error) = download_file(lzma.url, cur.clone(), callback, Some(lzma.sha1), true){
+                        if let Err(error) = download_file(lzma.url, cur.clone(), callback, Some(lzma.sha1), true).await {
                              return Err(error);
                         }
                     } else {
-                        if let Err(error) = download_file(download.raw.url.clone(), cur.clone(), callback, Some(download.raw.sha1.clone()), false){
+                        if let Err(error) = download_file(download.raw.url.clone(), cur.clone(), callback, Some(download.raw.sha1.clone()), false).await {
                             return Err(error);
                         }
                     }
@@ -174,7 +174,7 @@ pub fn install_jvm_runtime(jvm_version: MinecraftJavaRuntime, minecraft_dir: Pat
 
     let version = minecraft_dir.join("runtime").join(jvm_version.to_string()).join(arch).join(".version");
 
-    if let Err(error) = write(version,manifest.version.name){
+    if let Err(error) = write(version,manifest.version.name).await {
         return Err(LauncherLibError::OS {
             source: error,
             msg: "Failed to write file".into()
@@ -245,9 +245,9 @@ mod tests {
     fn test_callback(event: Event) {
         println!("{:#?}",event);
     }
-    #[test]
-    fn test_install_jvm_runtime() {
-        if let Err(err) = install_jvm_runtime(MinecraftJavaRuntime::JavaRuntimeBeta, PathBuf::from("C:\\Users\\Collin\\AppData\\Roaming\\.minecraft"), test_callback) {
+    #[tokio::test]
+    async fn test_install_jvm_runtime() {
+        if let Err(err) = install_jvm_runtime(MinecraftJavaRuntime::JavaRuntimeBeta, PathBuf::from("C:\\Users\\Collin\\AppData\\Roaming\\.minecraft"), test_callback).await {
             eprintln!("{}",err);
         }
         
@@ -259,9 +259,9 @@ mod tests {
             Err(err) => eprintln!("{}",err)
         }
     }
-    #[test]
-    fn test_get_jvm_runtimes() {
-        match get_jvm_runtimes() {
+    #[tokio::test]
+    async fn test_get_jvm_runtimes() {
+        match get_jvm_runtimes().await {
             Ok(value) => println!("{:#?}",value),
             Err(err) => eprintln!("{}",err)
         }
@@ -282,9 +282,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_get_manifest() {
-        if let Ok(value) = get_jvm_runtimes() {
+    #[tokio::test]
+    async fn test_get_manifest() {
+        if let Ok(value) = get_jvm_runtimes().await {
             match get_manifest("windows-x64".into(), MinecraftJavaRuntime::JavaRuntimeAlpha, value) {
                 Ok(value) => println!("{:#?}",value),
                 Err(err) => eprintln!("{}",err)

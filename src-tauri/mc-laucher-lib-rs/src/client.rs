@@ -1,7 +1,7 @@
 use crate::command::get_launch_command;
 use crate::expections::{LauncherLibError,LibResult};
 use crate::utils::get_minecraft_directory;
-use crate::vanilla::install_minecraft_version;
+use crate::install::install_minecraft_version;
 use crate::fabric::install_fabric;
 use crate::forge::install_forge;
 use crate::optifine::install_optifine;
@@ -48,12 +48,12 @@ impl Client {
             Ok(false)
         }
     }
-    pub fn run(&mut self) -> LibResult<()> {
+    pub async fn start(&mut self) -> LibResult<()> {
         if self.process.is_some() {
             return Err(LauncherLibError::General("A instance of minecraft is already running".into()));
         }
 
-        let (java,args) = match get_launch_command(self.minecraft.clone(), self.minecraft_directory.clone(), &mut self.options) {
+        let (java,args) = match get_launch_command(self.minecraft.clone(), self.minecraft_directory.clone(), &mut self.options).await {
             Ok(value) => value,
             Err(err) => return Err(err)
         };
@@ -93,7 +93,7 @@ pub struct ClientBuilder {
 }
 
 impl ClientBuilder {
-    pub fn install(manifest: InstallManifest, minecraft_directory: Option<PathBuf>, callback: Callback, temp_path: Option<PathBuf>, cache_path: Option<PathBuf>, java: Option<PathBuf>) -> LibResult<()> {
+    pub async fn install(manifest: InstallManifest, minecraft_directory: Option<PathBuf>, callback: Callback, temp_path: Option<PathBuf>, cache_path: Option<PathBuf>, java: Option<PathBuf>) -> LibResult<()> {
         let mc_dir = if let Some(dir) = minecraft_directory { dir } else { 
             match get_minecraft_directory() {
                 Ok(value) => value,
@@ -107,31 +107,31 @@ impl ClientBuilder {
                     Some(value) => value,
                     None => return Err(LauncherLibError::General("Missing temp path".into()))
                 };
-                install_fabric(manifest.minecraft.clone(),mc_dir,manifest.modloader_version,callback,java,temp)
+                install_fabric(manifest.minecraft.clone(),mc_dir,manifest.modloader_version,callback,java,temp).await
             }
             Loader::Forge => {
                 let temp = match temp_path {
                     Some(value) => value,
                     None => return Err(LauncherLibError::General("Missing temp path".into()))
                 };
-                install_forge(manifest.minecraft.clone(), mc_dir, temp, callback, cache_path, manifest.modloader_version, java, manifest.cache_cli, manifest.cache_install)
+                install_forge(manifest.minecraft.clone(), mc_dir, temp, callback, cache_path, manifest.modloader_version, java, manifest.cache_cli, manifest.cache_install).await
             }
             Loader::Optifine => {
                 let temp = match temp_path {
                     Some(value) => value,
                     None => return Err(LauncherLibError::General("Missing temp path".into()))
                 };
-                install_optifine(manifest.minecraft.clone(), mc_dir, temp, callback, cache_path, manifest.modloader_version, java, manifest.cache_cli, manifest.cache_install)
+                install_optifine(manifest.minecraft.clone(), mc_dir, temp, callback, cache_path, manifest.modloader_version, java, manifest.cache_cli, manifest.cache_install).await
             }
             Loader::Vanilla => {
-                install_minecraft_version(manifest.minecraft.clone(),mc_dir,callback)
+                install_minecraft_version(manifest.minecraft.clone(),mc_dir,callback).await
             }
         }
     }
-    pub fn install_str(manifest: String, minecraft_directory: Option<PathBuf>, callback: Callback, temp_path: Option<PathBuf>, cache_path: Option<PathBuf>, java: Option<PathBuf>) -> LibResult<()> {
+    pub async fn install_str(manifest: String, minecraft_directory: Option<PathBuf>, callback: Callback, temp_path: Option<PathBuf>, cache_path: Option<PathBuf>, java: Option<PathBuf>) -> LibResult<()> {
         match serde_json::from_str::<InstallManifest>(&manifest) {
             Err(err) => Err(LauncherLibError::ParseJsonSerde(err)),
-            Ok(value) => ClientBuilder::install(value, minecraft_directory, callback, temp_path, cache_path, java)
+            Ok(value) => ClientBuilder::install(value, minecraft_directory, callback, temp_path, cache_path, java).await
         }
     }
     pub fn new(minecraft_dir: Option<PathBuf>) -> LibResult<Self> {
@@ -247,55 +247,55 @@ mod tests {
     use std::thread;
     use std::time;
 
-    #[test]
-    fn test_optifine_install() {
+    #[tokio::test]
+    async fn test_optifine_install() {
         if let Err(err) = ClientBuilder::install(
                 InstallManifest::new("1.18.1".into(), Loader::Optifine), 
                 None,
                 |event| { println!("{:#?}",event); },
                 Some(PathBuf::from("C:\\Users\\Collin\\Downloads\\")), None, None
-            ) {
+            ).await {
             eprintln!("{}",err);
         }
     }
 
-    #[test]
-    fn test_forge_install() {
+    #[tokio::test]
+    async fn test_forge_install() {
         if let Err(err) = ClientBuilder::install(
                 InstallManifest::new("1.18.1".into(), Loader::Forge), 
                 None,
                 |event| { println!("{:#?}",event); },
                 Some(PathBuf::from("C:\\Users\\Collin\\Downloads\\")), None, None
-            ) {
+            ).await {
             eprintln!("{}",err);
         }
     }
 
-    #[test]
-    fn test_fabric_install() {
+    #[tokio::test]
+    async fn test_fabric_install() {
         if let Err(err) = ClientBuilder::install(
             InstallManifest::new("1.18.1".into(), Loader::Fabric), 
                 None,
                 |event| { println!("{:#?}",event); },
                 Some(PathBuf::from("C:\\Users\\Collin\\Downloads\\")), None, None
-            ) {
+            ).await {
             eprintln!("{}",err);
         }
     }
 
-    #[test]
-    fn test_vinilla_install() {
+    #[tokio::test]
+    async fn test_vinilla_install() {
         if let Err(err) = ClientBuilder::install(
             InstallManifest::new("1.17.1".into(), Loader::Vanilla), 
                 None, 
                 |event| { println!("{:#?}",event); }, None, None, None
-            ) {
+            ).await {
             eprintln!("{}",err);
         }
     }
 
-    #[test]
-    fn test_client_builder() {
+    #[tokio::test]
+    async fn test_client_builder() {
         use crate::login::{ms_login_url,get_auth_code,login_microsoft};
 
         let client_id = std::env::var("CLIENT_ID").expect("Failed to get client id");
@@ -321,7 +321,7 @@ mod tests {
             }
         };
 
-        let account = match login_microsoft(client_id.clone(), redirect, auth_code) {
+        let account = match login_microsoft(client_id.clone(), redirect, auth_code).await {
             Ok(account) => account,
             Err(err) => {
                 eprintln!("{}",err);
@@ -346,7 +346,7 @@ mod tests {
 
                 println!("{:#?}",runner);
 
-                if let Err(err) = runner.run() {
+                if let Err(err) = runner.start().await {
                     eprintln!("{}",err);
                 }
 

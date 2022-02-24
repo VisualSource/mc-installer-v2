@@ -8,7 +8,7 @@ use mc_laucher_lib_rs::{
 };
 use serde::{Deserialize, Serialize};
 use log::{ info, error };
-use tauri::{Manager, Runtime};
+use tauri::{Runtime, async_runtime  };
 
 #[derive(Serialize, Clone)]
 pub struct LaunchStatus {
@@ -36,27 +36,15 @@ pub async fn run_game<R: Runtime>(state: tauri::State<'_, AppState>, window: tau
   if let Err(error) = window.emit("rustyminecraft://launch_status", LaunchStatus { task: 1, msg: "Authenicating".into() }) {
     error!("{}",error);
   }
-  let handler = thread::spawn(||{
-    login_microsoft_refresh(CLIENT_ID.into(),REDIRECT_URI.into(), settings.refresh_token)
-  });
+ 
 
-  let account = match handler.join() {
-    Ok(result) => {
-      match result {
-        Ok(value) => value,
-        Err(err) => {
-          if let Err(error) = window.emit("rustyminecraft://launch_error", err.to_string()) {
-            error!("{}",error);
-          }
-          return Err(err.to_string())
-        }
-      }
-    }
-    Err(_err) => {
-      if let Err(error) = window.emit("rustyminecraft://launch_error", "Failed to authenicate") {
+  let account = match login_microsoft_refresh(CLIENT_ID.into(),REDIRECT_URI.into(), settings.refresh_token).await {
+    Ok(value) => value,
+    Err(err) => {
+      if let Err(error) = window.emit("rustyminecraft://launch_error", err.to_string()) {
         error!("{}",error);
       }
-      return Err("Failed to rejoin thread".into());
+      return Err(err.to_string())
     }
   };
 
@@ -112,7 +100,7 @@ pub async fn run_game<R: Runtime>(state: tauri::State<'_, AppState>, window: tau
     error!("{}",error);
   }
 
-  if let Err(err) = client.run() {
+  if let Err(err) = client.start().await {
     error!("{}",err);
     if let Err(error) = window.emit("rustyminecraft://launch_error", err.to_string()) {
       error!("{}",error);

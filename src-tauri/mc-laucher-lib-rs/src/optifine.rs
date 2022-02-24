@@ -1,7 +1,7 @@
 use crate::utils::{ get_http_client, download_file };
 use crate::expections::{ LauncherLibError,LibResult };
 use crate::runtime::get_exectable_path;
-use crate::vanilla::install_minecraft_version;
+use crate::install::install_minecraft_version;
 use crate::json::{
     runtime::MinecraftJavaRuntime,
     install::{
@@ -9,8 +9,9 @@ use crate::json::{
     }
 };
 use scraper::{Html, Selector};
-use std::process::{ Command,Stdio };
-use std::fs::remove_file;
+use tokio::process::Command;
+use tokio::fs::remove_file;
+use std::process::{ Stdio };
 use std::path::PathBuf;
 use log::{info};
 
@@ -25,15 +26,15 @@ pub struct OptifineVersion {
     pub mc: String
 }
 
-pub fn get_optifine_versions() -> LibResult<Vec<OptifineVersion>> {
-    let client = match get_http_client() {
+pub async fn get_optifine_versions() -> LibResult<Vec<OptifineVersion>> {
+    let client = match get_http_client().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
 
-    match client.get(OPTIFINE_DOWNLOADS_PAGE).send() {
+    match client.get(OPTIFINE_DOWNLOADS_PAGE).send().await {
         Ok(value) => {
-            match value.text() {
+            match value.text().await {
                 Ok(html) => {   
                     let document = Html::parse_document(&html);
                     let selector = Selector::parse("tr.downloadLine.downloadLineMain").expect("Failed to parse html query");
@@ -76,14 +77,14 @@ pub fn get_optifine_versions() -> LibResult<Vec<OptifineVersion>> {
     }
 }
 
-pub fn get_optifine_download(url: String) -> LibResult<String> {
-    let client = match get_http_client() {
+pub async fn get_optifine_download(url: String) -> LibResult<String> {
+    let client = match get_http_client().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
-    match client.get(url).send() {
+    match client.get(url).send().await {
         Ok(value) => {
-            match value.text() {
+            match value.text().await {
                 Ok(html) => {
                     let document = Html::parse_document(&html);
 
@@ -109,8 +110,8 @@ pub fn get_optifine_download(url: String) -> LibResult<String> {
     }
 }
 
-pub fn install_optifine(mc: String, mc_dir: PathBuf, temp_path: PathBuf, callback: Callback, cache_path: Option<PathBuf>, loader: Option<String>, java: Option<PathBuf>, cache_headless: bool, cache_installer: bool) -> LibResult<()> {
-    let versions: Vec<OptifineVersion> = match get_optifine_versions() {
+pub async fn install_optifine(mc: String, mc_dir: PathBuf, temp_path: PathBuf, callback: Callback, cache_path: Option<PathBuf>, loader: Option<String>, java: Option<PathBuf>, cache_headless: bool, cache_installer: bool) -> LibResult<()> {
+    let versions: Vec<OptifineVersion> = match get_optifine_versions().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
@@ -167,25 +168,25 @@ pub fn install_optifine(mc: String, mc_dir: PathBuf, temp_path: PathBuf, callbac
 
     callback(Event::Status("Checking for vanilla minecraft".into()));
     if !mc_dir.join("versions").join(mc.clone()).join(format!("{}.json",mc.clone())).is_file() {
-        if let Err(err) = install_minecraft_version(mc.clone(),mc_dir.clone(),callback) {
+        if let Err(err) = install_minecraft_version(mc.clone(),mc_dir.clone(),callback).await {
             return Err(err);
         }
     }
 
     callback(Event::Status("Downloading OptiFine Headless".into()));
     callback(Event::progress(0, 2));
-    if let Err(err) = download_file(OPTIFINE_HEADLESS.into(), headless_path.clone(), callback, None, false) {
+    if let Err(err) = download_file(OPTIFINE_HEADLESS.into(), headless_path.clone(), callback, None, false).await {
         return Err(err);
     }   
     callback(Event::progress(1, 2));
 
-    let download_url = match get_optifine_download(version.url.clone()) {
+    let download_url = match get_optifine_download(version.url.clone()).await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
 
     callback(Event::Status("Downloading OptiFine".into()));
-    if let Err(err) = download_file(download_url, installer_path.clone(), callback, None, false) {
+    if let Err(err) = download_file(download_url, installer_path.clone(), callback, None, false).await {
         return Err(err);
     }
     callback(Event::progress(2, 2));
@@ -212,7 +213,7 @@ pub fn install_optifine(mc: String, mc_dir: PathBuf, temp_path: PathBuf, callbac
         mc_dir.to_str().expect("Failed to convert to str")
     ];
 
-    match Command::new(exec).args(args).stdout(Stdio::inherit()).output() {
+    match Command::new(exec).args(args).stdout(Stdio::inherit()).output().await {
         Ok(output) => {
             info!("Stderr: {}",String::from_utf8_lossy(&output.stderr));
             info!("Stdout: {}",String::from_utf8_lossy(&output.stdout));
@@ -221,7 +222,7 @@ pub fn install_optifine(mc: String, mc_dir: PathBuf, temp_path: PathBuf, callbac
             callback(Event::Status("Starting cleanup".into()));
             callback(Event::progress(0, 2));
             if !cache_headless {
-                if let Err(err) = remove_file(headless_path) {
+                if let Err(err) = remove_file(headless_path).await {
                     return Err(LauncherLibError::OS {
                         source: err,
                         msg: "Failed to remove optiFine headless runner".into()
@@ -231,7 +232,7 @@ pub fn install_optifine(mc: String, mc_dir: PathBuf, temp_path: PathBuf, callbac
             callback(Event::progress(1, 2));
 
             if !cache_installer {
-                if let Err(err) = remove_file(installer_path) {
+                if let Err(err) = remove_file(installer_path).await {
                     return Err(LauncherLibError::OS {
                         source: err,
                         msg: "Failed to remove optiFine installer jar".into()
@@ -255,27 +256,27 @@ pub fn install_optifine(mc: String, mc_dir: PathBuf, temp_path: PathBuf, callbac
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_get_optifine_download() {
+    #[tokio::test]
+    async fn test_get_optifine_download() {
         let download = "http://optifine.net/adloadx?f=OptiFine_1.18.1_HD_U_H4.jar".to_string();
-        match get_optifine_download(download) {
+        match get_optifine_download(download).await {
             Ok(value) => println!("{}",value),
             Err(err) => eprintln!("{}",err)
         }
     }
 
-    #[test]
-    fn test_install_optifine() {
+    #[tokio::test]
+    async fn test_install_optifine() {
         let mc_dir = PathBuf::from("C:\\Users\\Collin\\AppData\\Roaming\\.minecraft");
         let temp_path = PathBuf::from("C:\\Users\\Collin\\Downloads\\");
-        if let Err(err) = install_optifine("1.18.1".into(), mc_dir, temp_path, |e|{ println!("{:#?}",e) }, None, None, None, false,false) {
+        if let Err(err) = install_optifine("1.18.1".into(), mc_dir, temp_path, |e|{ println!("{:#?}",e) }, None, None, None, false,false).await {
             eprintln!("{}",err);
         }
     }
 
-    #[test]
-    fn test_get_optifine_versions() {
-        match get_optifine_versions() {
+    #[tokio::test]
+    async fn test_get_optifine_versions() {
+        match get_optifine_versions().await {
             Ok(value) => println!("{:#?}",value),
             Err(err) => eprintln!("{}",err)
         }

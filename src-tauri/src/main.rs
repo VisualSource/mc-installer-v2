@@ -11,6 +11,10 @@ use log::{ info };
 use commands::{
   get_user_cache,
   get_minecraft_news,
+  stable_vanilla_versions,
+  stable_optifine_versions,
+  stable_fabric_versions,
+  stable_forge_versions,
   play:: {
     run_game
   },
@@ -50,7 +54,11 @@ fn main() {
     can_run_setup,
     setup_complete,
     import_profiles,
-    run_game
+    run_game,
+    stable_vanilla_versions,
+    stable_optifine_versions,
+    stable_fabric_versions,
+    stable_forge_versions
   ])
   .run(tauri::generate_context!())
   .expect("error while running tauri application");

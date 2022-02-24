@@ -2,13 +2,14 @@ use crate::expections::{ LauncherLibError, LibResult };
 use crate::utils::download_file;
 use crate::mod_utiles::get_metadata;
 use crate::runtime::get_exectable_path;
-use crate::vanilla::install_minecraft_version;
+use crate::install::install_minecraft_version;
 use crate::json::{
     runtime::MinecraftJavaRuntime,
     install::{ Callback, Event }
 };
-use std::process::{ Command,Stdio };
-use std::fs::remove_file;
+use tokio::process::Command;
+use tokio::fs::remove_file;
+use std::process::{ Stdio };
 use std::path::PathBuf;
 use log::{info};
 
@@ -16,8 +17,8 @@ const FORGE_DOWNLOAD_URL: &str = "https://files.minecraftforge.net/maven/net/min
 const FORGE_HEADLESS_URL: &str = "https://github.com/TeamKun/ForgeCLI/releases/download/1.0.1/ForgeCLI-1.0.1-all.jar";
 const FORGE_MAVEN_ROOT: &str = "https://maven.minecraftforge.net/net/minecraftforge/forge/";
 
-pub fn get_forge_versions() -> LibResult<Vec<String>> {
-    match get_metadata(FORGE_MAVEN_ROOT) {
+pub async fn get_forge_versions() -> LibResult<Vec<String>> {
+    match get_metadata(FORGE_MAVEN_ROOT).await {
         Ok(value) => {
             Ok(value.versioning.versions.version)
         },
@@ -25,8 +26,8 @@ pub fn get_forge_versions() -> LibResult<Vec<String>> {
     }
 }
 
-pub fn is_supported(mc: String) -> LibResult<bool> {
-    match get_forge_versions() {
+pub async fn is_supported(mc: String) -> LibResult<bool> {
+    match get_forge_versions().await {
         Ok(versions) => {
             for version in versions {
                 if let Some(forge) = version.split("-").collect::<Vec<&str>>().get(0) {
@@ -41,8 +42,8 @@ pub fn is_supported(mc: String) -> LibResult<bool> {
     }
 }
 
-pub fn vaild_forge_version(forge: String, mc: Option<String>) -> LibResult<bool> {
-    match get_forge_versions() {
+pub async fn vaild_forge_version(forge: String, mc: Option<String>) -> LibResult<bool> {
+    match get_forge_versions().await {
         Ok(versions) => {
             for version in versions {
                 let data = version.split("-").collect::<Vec<&str>>();
@@ -69,11 +70,11 @@ pub fn vaild_forge_version(forge: String, mc: Option<String>) -> LibResult<bool>
     }
 }
 
-pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback: Callback, cache_path: Option<PathBuf>, loader: Option<String>, java: Option<PathBuf>, cache_headless: bool, cache_installer: bool) -> LibResult<()> {
+pub async fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback: Callback, cache_path: Option<PathBuf>, loader: Option<String>, java: Option<PathBuf>, cache_headless: bool, cache_installer: bool) -> LibResult<()> {
 
     let loader_version = match loader {
         Some(value) => {
-            match vaild_forge_version(value.clone(), Some(mc.clone())) {
+            match vaild_forge_version(value.clone(), Some(mc.clone())).await {
                 Ok(r) => {
                     if !r {
                         return Err(LauncherLibError::Unsupported(mc));
@@ -85,7 +86,7 @@ pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback:
             }
         }
         None => {
-            match get_forge_versions() {
+            match get_forge_versions().await {
                 Ok(versions) => {
                     let mut data = String::default();
                     for version in versions {
@@ -131,7 +132,7 @@ pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback:
 
     callback(Event::Status("Checking for vanilla minecraft".into()));
     if !mc_dir.join("versions").join(mc.clone()).join(format!("{}.json",mc.clone())).is_file() {
-        if let Err(err) = install_minecraft_version(mc.clone(), mc_dir.clone(), callback) {
+        if let Err(err) = install_minecraft_version(mc.clone(), mc_dir.clone(), callback).await {
             return Err(err);
         }
     }
@@ -143,7 +144,7 @@ pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback:
 
     callback(Event::Status("Downloading ForgeCLI".into()));
     callback(Event::progress(0, 2));
-    if let Err(err) = download_file(FORGE_HEADLESS_URL.into(), headless_file.clone(), callback, None, false) {
+    if let Err(err) = download_file(FORGE_HEADLESS_URL.into(), headless_file.clone(), callback, None, false).await {
         return Err(err);
     }
     callback(Event::progress(1, 2));
@@ -151,7 +152,7 @@ pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback:
     
     let forge_url = FORGE_DOWNLOAD_URL.replace("{version}", format!("{}-{}",mc.clone(),loader_version.clone()).as_str()).to_string();
     callback(Event::Status("Downloading Forge".into()));
-    if let Err(err) = download_file(forge_url, forge_jar_file.clone(), callback, None, false) {
+    if let Err(err) = download_file(forge_url, forge_jar_file.clone(), callback, None, false).await {
         return Err(err);
     }
     callback(Event::progress(2, 2));
@@ -180,7 +181,7 @@ pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback:
         mc_dir.to_str().expect("Failed to convert to str")
     ];
 
-    match Command::new(exec).args(args).stdout(Stdio::inherit()).output() {
+    match Command::new(exec).args(args).stdout(Stdio::inherit()).output().await {
         Ok(output) => {
             info!("Stderr: {}",String::from_utf8_lossy(&output.stderr));
             info!("Stdout: {}",String::from_utf8_lossy(&output.stdout));
@@ -190,7 +191,7 @@ pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback:
             callback(Event::progress(0, 2));
 
             if !cache_headless {
-                if let Err(err) = remove_file(headless_file) {
+                if let Err(err) = remove_file(headless_file).await {
                     return Err(LauncherLibError::OS {
                         source: err,
                         msg: "Failed to remove ForgeCLI.jar".into()
@@ -199,7 +200,7 @@ pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback:
             }
             callback(Event::progress(1, 2));
             if !cache_installer {
-                if let Err(err) = remove_file(forge_jar_file) {
+                if let Err(err) = remove_file(forge_jar_file).await {
                     return Err(LauncherLibError::OS {
                         source: err,
                         msg: "Failed to remove forge installer jar".into()
@@ -221,17 +222,17 @@ pub fn install_forge(mc: String, mc_dir: PathBuf, temp_path: PathBuf,  callback:
 mod tests {
     use super::*;
     
-    #[test]
-    fn test_get_forge_versions() {
-        match get_forge_versions() {
+    #[tokio::test]
+    async fn test_get_forge_versions() {
+        match get_forge_versions().await {
             Ok(value) => println!("{:#?}",value),
             Err(err) => eprintln!("{}",err)
         }
     }
 
-    #[test]
-    fn test_forge_is_supported() {
-        match is_supported("1.18.1".into()) {
+    #[tokio::test]
+    async fn test_forge_is_supported() {
+        match is_supported("1.18.1".into()).await {
             Ok(value) => {
                 assert_eq!(value,true);
             }
@@ -240,7 +241,7 @@ mod tests {
                 panic!();
             }
         }
-        match is_supported("1.56.1".into()) {
+        match is_supported("1.56.1".into()).await {
             Ok(value) => {
                 assert_eq!(value,false);
             }
@@ -251,9 +252,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_vaild_forge_version() {
-        match vaild_forge_version("39.0.75".into(),None) {
+    #[tokio::test]
+    async fn test_vaild_forge_version() {
+        match vaild_forge_version("39.0.75".into(),None).await {
             Ok(value) => {
                 assert_eq!(value,true);
             }
@@ -262,7 +263,7 @@ mod tests {
                 panic!();
             }
         }
-        match vaild_forge_version("39.0.75".into(),Some("1.18.1".into())) {
+        match vaild_forge_version("39.0.75".into(),Some("1.18.1".into())).await {
             Ok(value) => {
                 assert_eq!(value,true);
             }

@@ -42,8 +42,8 @@ pub fn get_auth_code(url: String) -> Option<String> {
     }
 }
 
-fn refresh_auth_token(client_id: String, redirect_uri: String, refresh_token: String) -> LibResult<AuthoriztionJson> {
-    let client = match get_http_client() {
+async fn refresh_auth_token(client_id: String, redirect_uri: String, refresh_token: String) -> LibResult<AuthoriztionJson> {
+    let client = match get_http_client().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
@@ -55,11 +55,10 @@ fn refresh_auth_token(client_id: String, redirect_uri: String, refresh_token: St
         ("redirect_uri",redirect_uri.as_str())
     ]);
 
-    debug!("{:#?}",params);
 
-    match client.post(MS_TOKEN_AUTHORIZATION_URL).form(&params).send() {
+    match client.post(MS_TOKEN_AUTHORIZATION_URL).form(&params).send().await {
         Ok(value) => {
-            match value.json::<AuthoriztionJson>() {
+            match value.json::<AuthoriztionJson>().await {
                 Ok(value) => Ok(value),
                 Err(err) => Err(LauncherLibError::PraseJsonReqwest(err))
             }
@@ -71,8 +70,8 @@ fn refresh_auth_token(client_id: String, redirect_uri: String, refresh_token: St
     }
 }
 
-fn get_authorization_token(client_id: String, redirect_uri: String, auth_code: String) -> LibResult<AuthoriztionJson> {
-    let client = match get_http_client() {
+async fn get_authorization_token(client_id: String, redirect_uri: String, auth_code: String) -> LibResult<AuthoriztionJson> {
+    let client = match get_http_client().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
@@ -84,9 +83,9 @@ fn get_authorization_token(client_id: String, redirect_uri: String, auth_code: S
         ("grant_type","authorization_code")
     ]);
 
-    match client.post(MS_TOKEN_AUTHORIZATION_URL).form(&params).send() {
+    match client.post(MS_TOKEN_AUTHORIZATION_URL).form(&params).send().await {
         Ok(value) => {
-            match value.json::<AuthoriztionJson>() {
+            match value.json::<AuthoriztionJson>().await {
                 Ok(value) => Ok(value),
                 Err(err) => Err(LauncherLibError::PraseJsonReqwest(err))
             }
@@ -98,8 +97,8 @@ fn get_authorization_token(client_id: String, redirect_uri: String, auth_code: S
     }
 }
 
-fn authenticate_with_xbl(access_token: String) -> LibResult<XboxLiveJson> {
-    let client = match get_http_client() {
+async fn authenticate_with_xbl(access_token: String) -> LibResult<XboxLiveJson> {
+    let client = match get_http_client().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
@@ -114,9 +113,9 @@ fn authenticate_with_xbl(access_token: String) -> LibResult<XboxLiveJson> {
         "TokenType": "JWT"
      });
 
-    match client.post("https://user.auth.xboxlive.com/user/authenticate").json(&payload).send() {
+    match client.post("https://user.auth.xboxlive.com/user/authenticate").json(&payload).send().await {
         Ok(res) => {
-            match res.json::<XboxLiveJson>(){
+            match res.json::<XboxLiveJson>().await {
                 Ok(value) => Ok(value),
                 Err(err) => Err(LauncherLibError::PraseJsonReqwest(err))
             }
@@ -128,8 +127,8 @@ fn authenticate_with_xbl(access_token: String) -> LibResult<XboxLiveJson> {
     }
 }
 
-fn authenticate_with_xsts(xbl_token: String) -> LibResult<XboxLiveJson> {
-    let client = match get_http_client() {
+async fn authenticate_with_xsts(xbl_token: String) -> LibResult<XboxLiveJson> {
+    let client = match get_http_client().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
@@ -145,9 +144,9 @@ fn authenticate_with_xsts(xbl_token: String) -> LibResult<XboxLiveJson> {
         "TokenType": "JWT"
     });
 
-    match client.post("https://xsts.auth.xboxlive.com/xsts/authorize").json(&payload).send() {
+    match client.post("https://xsts.auth.xboxlive.com/xsts/authorize").json(&payload).send().await {
         Ok(res) => {
-            match res.json::<XboxLiveJson>() {
+            match res.json::<XboxLiveJson>().await {
                 Ok(value) => Ok(value),
                 Err(err) => Err(LauncherLibError::PraseJsonReqwest(err))
             }
@@ -159,8 +158,8 @@ fn authenticate_with_xsts(xbl_token: String) -> LibResult<XboxLiveJson> {
     }
 }
 
-fn authenticate_with_minecraft(userhash: String, xsts_token: String) -> LibResult<MinecraftJson> {
-    let client = match get_http_client() {
+async fn authenticate_with_minecraft(userhash: String, xsts_token: String) -> LibResult<MinecraftJson> {
+    let client = match get_http_client().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
@@ -169,9 +168,9 @@ fn authenticate_with_minecraft(userhash: String, xsts_token: String) -> LibResul
         "identityToken": format!("XBL3.0 x={};{}",userhash,xsts_token).to_string()
     });
 
-    match client.post("https://api.minecraftservices.com/authentication/login_with_xbox").json(&payload).send() {
+    match client.post("https://api.minecraftservices.com/authentication/login_with_xbox").json(&payload).send().await {
         Ok(res) => {
-            match res.json::<MinecraftJson>() {
+            match res.json::<MinecraftJson>().await {
                 Ok(value) => Ok(value),
                 Err(err) => Err(LauncherLibError::PraseJsonReqwest(err))
             }
@@ -183,15 +182,15 @@ fn authenticate_with_minecraft(userhash: String, xsts_token: String) -> LibResul
     }
 }
 
-fn check_game_ownership(access_token: String) -> LibResult<()> {
-    let client = match get_http_client() {
+async fn check_game_ownership(access_token: String) -> LibResult<()> {
+    let client = match get_http_client().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
 
-    match client.get("https://api.minecraftservices.com/entitlements/mcstore").bearer_auth(access_token).send() {
+    match client.get("https://api.minecraftservices.com/entitlements/mcstore").bearer_auth(access_token).send().await {
         Ok(res) => {
-            match res.json::<GameOwnership>() {
+            match res.json::<GameOwnership>().await {
                 Ok(value) => {
                     if value.items.is_empty() {
                         return Err(LauncherLibError::General("Account does not own a copy of minecraft".into()))
@@ -211,15 +210,15 @@ fn check_game_ownership(access_token: String) -> LibResult<()> {
     }
 }
 
-fn get_minecraft_profile(token: String) -> LibResult<PlayerProfile> {
-    let client = match get_http_client() {
+async fn get_minecraft_profile(token: String) -> LibResult<PlayerProfile> {
+    let client = match get_http_client().await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
 
-    match client.get("https://api.minecraftservices.com/minecraft/profile").bearer_auth(token).send() {
+    match client.get("https://api.minecraftservices.com/minecraft/profile").bearer_auth(token).send().await {
         Ok(res) => {
-            match res.json::<PlayerProfile>() {
+            match res.json::<PlayerProfile>().await {
                 Ok(value) => Ok(value),
                 Err(err) => Err(LauncherLibError::PraseJsonReqwest(err))
             }
@@ -231,13 +230,13 @@ fn get_minecraft_profile(token: String) -> LibResult<PlayerProfile> {
     }
 }
 
-pub fn login_microsoft(client_id: String, redirect_uri: String, auth_code: String) -> LibResult<Account> {
-    let auth: AuthoriztionJson = match get_authorization_token(client_id, redirect_uri, auth_code) {
+pub async fn login_microsoft(client_id: String, redirect_uri: String, auth_code: String) -> LibResult<Account> {
+    let auth: AuthoriztionJson = match get_authorization_token(client_id, redirect_uri, auth_code).await {
         Ok(token) => token,
         Err(err) => return Err(err)
     };
 
-    let xbl: XboxLiveJson = match authenticate_with_xbl(auth.access_token.clone()) {
+    let xbl: XboxLiveJson = match authenticate_with_xbl(auth.access_token.clone()).await {
         Ok(profile) => profile,
         Err(err) => return Err(err)
     };
@@ -247,7 +246,7 @@ pub fn login_microsoft(client_id: String, redirect_uri: String, auth_code: Strin
         None => return Err(LauncherLibError::General("Failed to get userhash".into())) 
     };
 
-    let xsts: XboxLiveJson = match authenticate_with_xsts(xbl.token.clone()) {
+    let xsts: XboxLiveJson = match authenticate_with_xsts(xbl.token.clone()).await {
         Ok(value) => value,
         Err(err) => {
             eprintln!("{:#?}",err);
@@ -255,7 +254,7 @@ pub fn login_microsoft(client_id: String, redirect_uri: String, auth_code: Strin
         }
     };
 
-    let account: MinecraftJson = match authenticate_with_minecraft(userhash, xsts.token) {
+    let account: MinecraftJson = match authenticate_with_minecraft(userhash, xsts.token).await {
         Ok(value) => value,
         Err(err) => {
             eprintln!("{:#?}",err);
@@ -265,16 +264,14 @@ pub fn login_microsoft(client_id: String, redirect_uri: String, auth_code: Strin
 
     let access_token = account.access_token.clone();
 
-    if let Err(err) = check_game_ownership(access_token.clone()) {
+    if let Err(err) = check_game_ownership(access_token.clone()).await {
         return Err(err);
     }
 
-    let profile: PlayerProfile = match get_minecraft_profile(access_token.clone()) {
+    let profile: PlayerProfile = match get_minecraft_profile(access_token.clone()).await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
-
-    println!("{:#?}",profile);
 
     let xuid = match account.get_xuid() {
         Ok(value) => value,
@@ -289,13 +286,13 @@ pub fn login_microsoft(client_id: String, redirect_uri: String, auth_code: Strin
     })
 }
 
-pub fn login_microsoft_refresh(client_id: String, redirect_uri: String, refresh_token: String) -> LibResult<Account> {
-    let auth: AuthoriztionJson = match refresh_auth_token(client_id, redirect_uri, refresh_token) {
+pub async fn login_microsoft_refresh(client_id: String, redirect_uri: String, refresh_token: String) -> LibResult<Account> {
+    let auth: AuthoriztionJson = match refresh_auth_token(client_id, redirect_uri, refresh_token).await {
         Ok(token) => token,
         Err(err) => return Err(err)
     };
 
-    let xbl: XboxLiveJson = match authenticate_with_xbl(auth.access_token.clone()) {
+    let xbl: XboxLiveJson = match authenticate_with_xbl(auth.access_token.clone()).await {
         Ok(profile) => profile,
         Err(err) => return Err(err)
     };
@@ -305,23 +302,23 @@ pub fn login_microsoft_refresh(client_id: String, redirect_uri: String, refresh_
         None => return Err(LauncherLibError::General("Failed to get userhash".into())) 
     };
 
-    let xsts: XboxLiveJson = match authenticate_with_xsts(xbl.token.clone()) {
+    let xsts: XboxLiveJson = match authenticate_with_xsts(xbl.token.clone()).await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
 
-    let account: MinecraftJson = match authenticate_with_minecraft(userhash, xsts.token) {
+    let account: MinecraftJson = match authenticate_with_minecraft(userhash, xsts.token).await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
 
     let access_token = account.access_token.clone();
 
-    if let Err(err) = check_game_ownership(access_token.clone()) {
+    if let Err(err) = check_game_ownership(access_token.clone()).await {
         return Err(err);
     }
 
-    let profile: PlayerProfile = match get_minecraft_profile(access_token.clone()) {
+    let profile: PlayerProfile = match get_minecraft_profile(access_token.clone()).await {
         Ok(value) => value,
         Err(err) => return Err(err)
     };
