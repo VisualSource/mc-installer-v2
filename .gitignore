@@ -11,7 +11,7 @@
 # production
 /build
 /deprecated
-init.bat
+init.ps1
 # misc
 .DS_Store
 .env.local

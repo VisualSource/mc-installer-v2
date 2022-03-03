@@ -13,7 +13,7 @@ import ProfileRunBtn from '../components/view/ProfileRunBtn';
 import { Database, MinecraftProfile } from '../lib/db';
 
 import { default_profile } from '../lib/profile';
-import { settings_profile } from '../models/ProfileSettingsDialog';
+import { settings_profile } from '../models/ProfileEdit';
 import SettingsIcon from '@mui/icons-material/Settings';
 import StarIcon from '@mui/icons-material/Star';
 
@@ -57,7 +57,7 @@ export default function ProfileView() {
                             <List dense>
                                 <ListItem>
                                     <ListItemText>
-                                        Minecraft: <Box sx={{ display: "inline", color: "#06a006" }}>{data?.minecraft ?? "Unknown"}</Box>
+                                        Minecraft: <Box sx={{ display: "inline", color: "#06a006" }}>{data?.minecraft ?? "Unkown"}</Box>
                                     </ListItemText>
                                 </ListItem>
                                 <ListItem>
@@ -67,7 +67,7 @@ export default function ProfileView() {
                                 </ListItem>
                                 <ListItem>
                                     <ListItemText>
-                                        Modloader Version: <Box sx={{ display: "inline", color: "GrayText" }}>{data?.loader_version ?? "Unknown"}</Box>
+                                        Modloader Version: <Box sx={{ display: "inline", color: "GrayText" }}>{data?.loader_version ?? "Lastest"}</Box>
                                     </ListItemText>
                                 </ListItem>
                                 <ListItem>
@@ -78,7 +78,7 @@ export default function ProfileView() {
                             </List>
                         </Paper>
                     </Box>
-                    <ModList mods={data?.mods}/>
+                    <ModList uuid={data?.uuid} mods={data?.mods}/>
                 </Box>
             </Container>
         </Box>

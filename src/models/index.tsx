@@ -1,8 +1,9 @@
-import CreateProfileDialog from "./CreateProfileDialog";
-import ProfileSettingsDialog from './ProfileSettingsDialog';
+import CreateProfileDialog from "./CreateProfile";
+import ProfileEditDialog from "./ProfileEdit";
 import SelectProfile from "./SeleteProfile";
 import SetupDialog from "./SetupDialog";
 import RunningDialog from "./RunningDialog";
+import CreateModpack from './CreateModpack'
 import { Suspense } from 'react';
 import { Toaster } from 'react-hot-toast';
 
@@ -15,10 +16,11 @@ export default function Modals(){
             <Suspense fallback={null}>
                 <SetupDialog/>
             </Suspense>
+            <CreateModpack/>
             <RunningDialog/>
             <SelectProfile/>
             <CreateProfileDialog/>
-            <ProfileSettingsDialog/>
+            <ProfileEditDialog/>
         </>
     );
 }

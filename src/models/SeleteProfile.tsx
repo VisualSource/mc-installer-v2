@@ -5,31 +5,46 @@ import { Dialog, DialogTitle, List, ListItem, ListItemAvatar, ListItemText, Avat
 import ErrorMessage from '../components/ErrorMessage';
 import Loader from '../components/Loader';
 
-import { create_profile } from './CreateProfileDialog';
+import { create_profile } from './CreateProfile';
 import { fetchList, MinecraftProfile } from '../lib/db';
 
 import FeedIcon from '@mui/icons-material/Feed';
 import AddIcon from '@mui/icons-material/Add';
 
-export const select_profile = atom({
+interface IProfileSelect {
+    open: boolean;
+    callback: (uuid: string) => void
+}
+
+export const select_profile = atom<IProfileSelect>({
     key: "SelectProfile",
-    default: false
+    default: {
+        open: false,
+        callback: (uuid: string) => {}
+    }
 });
 
 export default function SelectProfile(){
-    const [open,setOpen] = useRecoilState(select_profile);
+    const [state,setOpen] = useRecoilState(select_profile);
     const openCreate = useSetRecoilState(create_profile);
     const { data, error, isLoading } = useQuery<MinecraftProfile[],Error>(["List","profiles"],()=>fetchList("profiles") as Promise<MinecraftProfile[]>);
 
-    const onClose = () => setOpen(false);
+    const onClose = () => setOpen({ open: false, callback: (uuid)=>{} });
+    const event = (uuid: string) => {
+       return () => {
+            state.callback(uuid);
+            onClose();
+        }
+    }
+
     return (
-        <Dialog open={open} onClose={onClose}>
+        <Dialog open={state.open} onClose={onClose}>
             <DialogTitle>Select Profile</DialogTitle>
             <List sx={{ pt: 0 }}>
                 {
                     isLoading ? <Loader/> : error ? <ErrorMessage message="Failed to load profiles"/> : (
                     data?.map((profile,i)=>(
-                        <ListItem key={i} autoFocus button onClick={()=>{onClose();}}>
+                        <ListItem key={i} autoFocus button onClick={event(profile.uuid)}>
                             <ListItemAvatar>
                                 <Avatar src={profile?.media.icon ?? undefined}>
                                     <FeedIcon htmlColor='white' fontSize="small"/>

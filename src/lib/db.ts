@@ -15,13 +15,14 @@ export interface Media {
 
 export interface ModRef {
   name: string;
-  media: Media,
-  uuid: string,
+  media: Media;
+  uuid: string;
   category: string;
-  required: string[]
-  supports: Loader[]
-  mc: string[],
-  description: string
+  required: string[];
+  supports: Loader[];
+  incompatable: string[];
+  mc: string[];
+  description: string;
 }
 export interface ModpackDef {
   name: string;
@@ -53,6 +54,24 @@ export interface MinecraftProfile {
   } | null
   mods: string[]
 }
+export interface ICreatableProfile {
+  media: Media,
+  name: string;
+  jvm_args: string;
+  minecraft: string;
+  loader: Loader,
+  loader_version: string | null,
+  dot_minecraft: string | null,
+  java: null | string,
+  mods?: string[];
+  category: string;
+  resolution: {
+    width: number,
+    height: number
+  } | null
+}
+
+export const JVM_ARGS = "-Xmx2G -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M";
 
 export class Database {
   static INSTANCE: Database | null = null;
@@ -75,10 +94,29 @@ export class Database {
   static async profileEdit(props: { uuid: string, data: any }, type: "update" | "delete") {
     const db = Database.GetInstance();
     if(type === "delete") {
-      return db.deleteProfile(props.uuid)
+      await db.deleteProfile(props.uuid);
+      return { text: await fetchList("profiles"), category: await getListCategory("profiles") };
     }
 
-    return db.updateProfile(props.uuid, props.data);
+    await db.updateProfile(props.uuid, props.data);
+    return { text: await fetchList("profiles"), category: await getListCategory("profiles") };
+  }
+  static async createProfile(props: ICreatableProfile) {
+    const db = Database.GetInstance();
+
+    await db.createProfile(props);
+
+    return { text: await fetchList("profiles"), category: await getListCategory("profiles") };
+  }
+  static async getModList(list: string[] = []): Promise<ModRef[]>{
+    let mods: ModRef[] = [];
+
+    for(const mod of list) {
+      const i = await Database.getItem<ModRef>(mod,"mods");
+      mods.push(i);  
+    }
+
+    return mods;
   }
   private db: Db;
   constructor(){
@@ -97,37 +135,35 @@ export class Database {
     media?: Media, 
     name?: string, 
     jvm_args?: string | null, 
-    java: string | null,
+    java?: string | null,
     minecraft?: string,
     loader?: Loader,
+    mods?: string[],
     loader_version?: string | null,
     category?: string,
     last_used?: string 
   }) {
     const profiles = this.db.collection("profiles");
-    await profiles.update({ uuid },params);
+    if("mods" in params) {
+      const profile = await profiles.findOne({ uuid }) as MinecraftProfile;
+      const mods = profile.mods.concat((params.mods as string[]));
+      
+      return profiles.update({ uuid },{ ...params, mods });
+    }
+    return profiles.update({ uuid },params);
   }
   public async deleteProfile(uuid: string) {
     const profiles = this.db.collection("profiles");
     await profiles.remove({ uuid });
   }
-  public async createProfile(profile: { 
-    media: Media, 
-    name: string, 
-    jvm_args: string | null,
-    java: string, 
-    minecraft: string, 
-    loader: Loader, 
-    loader_version: string | null,
-    category: string
-  }) {
+  public async createProfile(profile: ICreatableProfile) {
     const profiles = this.db.collection("profiles");
     const uuid = nanoid();
 
     await profiles.insert({
       ...profile,
         uuid,
-        mods: [],
+        mods: profile?.mods ?? [],
         created: new Date().toUTCString(),
         last_used: null
     });

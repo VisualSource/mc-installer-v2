@@ -3,6 +3,7 @@ import { appWindow } from '@tauri-apps/api/window';
 import { nanoid } from 'nanoid';
 import { toast } from 'react-hot-toast';
 import { Database,  type MinecraftProfile, type Loader } from './db';
+import { gt, coerce, SemVer } from 'semver';
 
 export enum WindowEvents {
     LoginError = "rustyminecraft://login_error",
@@ -167,20 +168,67 @@ export interface MinecraftVersion {
     loader_version: string | null
 }
 
-export async function get_minecraft_versions() {
-    return invoke<MinecraftVersion[]>("stable_vanilla_versions")
+export async function get_versions(type: Loader) {
+    switch(type) {
+        case "forge": {
+            const data = await invoke<{ [key: string]: string[] }>("stable_forge_versions");
+            return Object.keys(data).sort((a,b)=>{
+                if(gt(coerce(a) as SemVer ,coerce(b) as SemVer)) return -1;
+                return 1;
+            });
+        }
+        case "fabric": {
+            return invoke<string[]>("stable_fabric_versions")
+        }
+        case "optifine":{
+            const data = await invoke<{ [key: string]: string[] }>("stable_optifine_versions");
+            return Object.keys(data).sort((a,b)=>{
+                if(gt(coerce(a) as SemVer ,coerce(b) as SemVer)) return -1;
+                return 1;
+            });
+        }
+        default: 
+            return invoke<string[]>("stable_vanilla_versions")
+    }
 }
 
-export async function get_loader_versions(type: Loader): Promise<{ [version: string]: string[] }> {
+export async function get_loader_versions(type: Loader, minecraft: string): Promise<string[]> {
     switch (type) {
-        case "fabric":
-            return invoke("stable_fabric_versions");
-        case "forge":
-            return invoke("stable_forge_versions");
-        case "optifine":
-            return invoke("stable_optifine_versions")
+        case "forge":{
+            const data = await invoke<{ [key: string]: string[] }>("stable_forge_versions");
+
+            if(minecraft === "latest-release") {
+               let key = Object.keys(data).map(value=>coerce(value)?.raw ?? "0.0.0");
+
+                const latest = key.reduce((pre,cur)=>{ 
+                    if(gt(pre,cur,{ loose: true })) return pre; else return cur;
+                });
+
+               return data[latest];
+            }
+
+            if(!data[minecraft]) return [];
+
+            return data[minecraft];
+        }
+        case "optifine": {
+            const data = await invoke<{ [key: string]: string[] }>("stable_optifine_versions");
+            if(minecraft === "latest-release") {
+                let key = Object.keys(data).map(value=>coerce(value)?.raw ?? "0.0.0");
+ 
+                 const latest = key.reduce((pre,cur)=>{ 
+                     if(gt(pre,cur,{ loose: true })) return pre; else return cur;
+                 });
+ 
+                return data[latest];
+            }
+ 
+            if(!data[minecraft]) return [];
+ 
+            return data[minecraft];
+        }
         default:
-            return { vanilla: ["No Versions"] };
+            return [];
     }
 }
 

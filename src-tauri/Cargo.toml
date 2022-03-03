@@ -23,6 +23,7 @@ simplelog = "0.11.2"
 jsonwebtoken = "7.2.0"
 mc-laucher-lib-rs = { path = "mc-laucher-lib-rs" }
 regex = "1.5.4"
+semver_rs = "0.2.0"
 
 [dev-dependencies]
 tokio = { version = "1.16.1", features = [ "test-util", "macros" ] }

@@ -1,16 +1,14 @@
 use crate::files::user_cache::read_user_cache;
 use tauri::api::http::{ ClientBuilder, HttpRequestBuilder, ResponseType };
 use std::collections::HashMap;
-use serde::{ Serialize };
-use log::{ debug };
 use mc_laucher_lib_rs::{
     vanilla::{
         get_vanilla_versions
     },
     optifine::{
         get_optifine_versions
-    },
-    json::client::Loader };
+    }
+};
 pub mod login;
 pub mod state;
 pub mod importer;
@@ -54,25 +52,36 @@ pub async fn get_user_cache() -> Result<std::collections::HashMap<std::string::S
         Err(err) => Err(err)
     }
 }
-#[derive(Serialize)]
-pub struct MinecraftVersion {
-    loader: Loader,
-    minecraft: String,
-    loader_version: Option<String>
-}
 
 #[tauri::command]
-pub async fn stable_vanilla_versions() -> Result<Vec<MinecraftVersion>, String> {
+pub async fn stable_vanilla_versions() -> Result<Vec<String>, String> {
     match get_vanilla_versions().await {
         Ok(value) => {
-            let mut versions: Vec<MinecraftVersion> = vec![];
+            let mut versions: Vec<String> = vec![];
+            let vaild_semver = match regex::Regex::new(r"\d+.\d+.\d+(\d+|\w+)?") {
+                Ok(value) => value,
+                Err(err) => return Err(err.to_string())
+            };
 
             for i in value.iter().filter(|e|{ e.version_type == "release".to_string() }) {
-                versions.push(MinecraftVersion {
-                    minecraft: i.id.clone(),
-                    loader: Loader::Vanilla,
-                    loader_version: None
-                });
+                let key = if !vaild_semver.is_match(&i.id) {
+                    format!("{}.0",i.id.clone()).to_string()
+                } else {
+                    i.id.clone()
+                };
+
+                match semver_rs::satisfies(key.as_str(), ">=1.16.5", None) {
+                    Ok(value) => {
+                        if !value {
+                            continue;
+                        }
+                    }
+                    Err(_err) => {
+                        continue;
+                    }
+                }
+                
+                versions.push(i.id.clone());
             }
 
             Ok(versions)
@@ -82,29 +91,80 @@ pub async fn stable_vanilla_versions() -> Result<Vec<MinecraftVersion>, String> 
 }
 
 #[tauri::command]
-pub async fn stable_optifine_versions() -> Result<Vec<MinecraftVersion>, String> {
+pub async fn stable_optifine_versions() -> Result<std::collections::HashMap<String,Vec<String>>, String> {
     match get_optifine_versions().await {
         Ok(value) => {
-            debug!("{:#?}",value);
+            let mut versions: std::collections::HashMap<String,Vec<String>> = HashMap::new();
+            let vaild_semver = match regex::Regex::new(r"\d+.\d+.\d+(\d+|\w+)?") {
+                Ok(value) => value,
+                Err(err) => return Err(err.to_string())
+            };
 
-            Ok(vec![])
+            for i in value {
+                let key = if !vaild_semver.is_match(&i.mc) {
+                    format!("{}.0",i.mc.clone()).to_string()
+                } else {
+                    i.mc.clone()
+                };
+
+                match semver_rs::satisfies(key.as_str(), ">=1.16.5", None) {
+                    Ok(value) => {
+                        if !value {
+                            continue;
+                        }
+                    }
+                    Err(_err) => {
+                        continue;
+                    }
+                }
+                
+                match versions.get_mut(&i.mc) {
+                    Some(version) => {
+                            version.push(i.name);
+                    }
+                    None => {
+                        versions.insert(i.mc,vec![i.name]);
+                    }
+                } 
+            }
+            Ok(versions)
         }
         Err(err) => Err(err.to_string())
     }
 }
 
 #[tauri::command]
-pub async fn stable_fabric_versions() -> Result<Vec<MinecraftVersion>, String> {
+pub async fn stable_fabric_versions() -> Result<Vec<String>, String> {
     match mc_laucher_lib_rs::fabric::get_supported_mc_versions().await {
         Ok(value) => {
-            let mut versions: Vec<MinecraftVersion> = vec![];
+            let mut versions: Vec<String> = vec![];
+            let vaild_semver = match regex::Regex::new(r"\d+.\d+.\d+(\d+|\w+)?") {
+                Ok(value) => value,
+                Err(err) => return Err(err.to_string())
+            };
 
             for i in value {
-                versions.push(MinecraftVersion {
-                    minecraft: i.version.clone(),
-                    loader: Loader::Fabric,
-                    loader_version: None
-                });
+                let id = if !vaild_semver.is_match(&i.version) {
+                    format!("{}.0",i.version.clone()).to_string()
+                } else {
+                    i.version.clone()
+                };
+
+                match semver_rs::satisfies(id.as_str(), ">=1.16.5", None) {
+                    Ok(value) => {
+                        if !value {
+                            continue;
+                        }
+                    }
+                    Err(_err) => {
+                        continue;
+                    }
+                }
+
+
+                if i.stable {
+                    versions.push(i.version);
+                }
             }
 
             Ok(versions)
@@ -114,19 +174,52 @@ pub async fn stable_fabric_versions() -> Result<Vec<MinecraftVersion>, String> {
 }
 
 #[tauri::command]
-pub async fn stable_forge_versions() -> Result<Vec<MinecraftVersion>, String> {
+pub async fn stable_forge_versions() -> Result<std::collections::HashMap<String,Vec<String>>, String> {
     match mc_laucher_lib_rs::forge::get_forge_versions().await {
         Ok(value) => {
-            let mut versions: Vec<MinecraftVersion> = vec![];
+            let mut versions: std::collections::HashMap<String,Vec<String>> = HashMap::new();
+            let vaild_semver = match regex::Regex::new(r"\d+.\d+.\d+(\d+|\w+)?") {
+                Ok(value) => value,
+                Err(err) => return Err(err.to_string())
+            };
 
             for i in value {
-                versions.push(MinecraftVersion {
-                    minecraft: i.clone(),
-                    loader: Loader::Forge,
-                    loader_version: None
-                });
-            }
+                let id = i.split("-").collect::<Vec<&str>>();
+                let (real_key, key) = match id.get(0) {
+                    Some(value) => {
+                        if !vaild_semver.is_match(value) {
+                            (value.to_string(),format!("{}.0",value).to_string())
+                        } else {
+                            (value.to_string(),value.to_string())
+                        }
+                    },
+                    None => continue
+                };
 
+                match semver_rs::satisfies(key.as_str(), ">=1.16.5", None) {
+                    Ok(value) => {
+                        if !value {
+                            continue;
+                        }
+                    }
+                    Err(_err) => {
+                        continue;
+                    }
+                }
+
+                match versions.get_mut(&real_key) {
+                    Some(version) => {
+                        if let Some(loader_version) = id.get(1) {
+                            version.push(loader_version.to_string());
+                        }
+                    }
+                    None => {
+                        if let Some(loader_version) = id.get(1) {
+                            versions.insert(real_key,vec![loader_version.to_string()]);
+                        }
+                    }
+                } 
+            }
             Ok(versions)
         }
         Err(err) => Err(err.to_string())

@@ -6,7 +6,7 @@ import ErrorMessage from '../ErrorMessage';
 import { CardMedia, Grid , Card, CardActionArea, Container, Typography, Button } from '@mui/material';
 
 import { fetchList } from '../../lib/db';
-import { create_profile } from '../../models/CreateProfileDialog';
+import { create_profile } from '../../models/CreateProfile';
 
 import PackImage from '../../images/pack.webp';
 

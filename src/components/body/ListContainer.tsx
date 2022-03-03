@@ -7,7 +7,9 @@ import ErrorMessage from '../ErrorMessage';
 import TextListGroup, {TextListItem} from './TextListGroup';
 
 import { getListCategory } from '../../lib/db';
-import { create_profile } from '../../models/CreateProfileDialog';
+import { create_profile } from '../../models/CreateProfile';
+
+import PackImage from '../../images/pack.webp';
 
 import PlusIcon from '@mui/icons-material/Add';
 
@@ -33,7 +35,7 @@ export default function ListContainer(){
                             return (
                                 <TextListGroup name={cat} key={i}>
                                     {data[cat].map((value: any, ki: number)=>{
-                                        return (<TextListItem name={value.name} icon={value.media?.icon ?? "https://via.placeholder.com/150/771796"} uuid={value.uuid} key={ki} />)
+                                        return (<TextListItem name={value.name} icon={value.media?.icon ?? PackImage} uuid={value.uuid} key={ki} />)
                                     })}
                                 </TextListGroup>
                             );

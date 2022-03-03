@@ -22,7 +22,7 @@ export default function PlayBtn(){
     startIcon={isLoading ? <SyncIcon/> : error ? <ErrorIcon/> : !authenicated ? <Login/> : <PlayArrow/>} 
     color={isLoading ? "primary" : error ? "error" : !authenicated ? "primary" : "success" } 
     variant="contained" 
-    onClick={(isLoading || error || !authenicated) ? undefined : selectedProfile?.uuid ?  ()=>{ running_dialog.open(); run_game(user?.xuid as string, selectedProfile.uuid as string);} : ()=>openSelect(true)}>{
+    onClick={(isLoading || error || !authenicated) ? undefined : selectedProfile?.uuid ?  ()=>{ running_dialog.open(); run_game(user?.xuid as string, selectedProfile.uuid as string);} : ()=>openSelect({ open: true, callback: (uuid) => { console.log(uuid,"Use profile"); } })}>{
         isLoading ? "Loading..." : error ? "Error" : !authenicated ? "Login To Play" : selectedProfile?.uuid ? `Play: ${selectedProfile.name}` : "Play"
     }</Button>);
 }
